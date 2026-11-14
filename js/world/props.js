@@ -5,9 +5,11 @@
 import { SegGrid, polyLen, along, ribbon, pointInPoly, bbox, polyArea } from './geom.js';
 import * as M from './models.js';
 
-export function furnish(m, env) {
+export async function furnish(m, env) {
   const { data, ctx, greens, footprints, lakes } = env;
   const rnd = ctx.rng;
+  const D = ctx.density;
+  const step = env.step || (async () => {});
   const lamps = (ctx.lamps = []);
 
   // Index of streets (tag = half width) so props keep clear of carriageways.
@@ -76,10 +78,11 @@ export function furnish(m, env) {
   ctx.place = { free, nearBuilding, onRoad, inWater, mark, taken, spotNear, inPaved };
 
   const plant = (x, z, kind, s, painted) => {
-    if (inPaved(x, z)) return;
+    if (inPaved(x, z) || !ctx.drawAt(x, z)) return;
+    if (D < 1 && rnd() > D + (painted ? 0.25 : 0)) return;
     m.chunk(x, z);
     let r = 0;
-    const lite = !ctx.detailAt(x, z);
+    const lite = D < 0.6 || !ctx.detailAt(x, z);
     m.at(x, 0, z, rnd() * 6.28, () => (r = M.tree(m, kind, s, rnd, painted, lite)));
     if (r) ctx.solids.push([x, z, r + 0.15]);
     mark(x, z);
@@ -87,7 +90,9 @@ export function furnish(m, env) {
   const STREET_TREES = ['round', 'round', 'round', 'rain', 'gulmohar', 'ashoka', 'palm'];
 
   // ---- along the streets ---------------------------------------------------
+  let ri = 0;
   for (const r of data.roads) {
+    if (++ri % 400 === 0) await step(0.56 + 0.2 * (ri / data.roads.length));
     if (r.tu || r.h || r.br) continue;
     const c = r.c;
     if (!'PSERL'.includes(c)) continue;
@@ -121,7 +126,7 @@ export function furnish(m, env) {
     }
 
     // electricity poles and wires on the lanes
-    if (!major && inPlay && len > 30 && rnd() < 0.7) {
+    if (!major && inPlay && D >= 0.75 && len > 30 && rnd() < 0.7) {
       const side = rnd() < 0.5 ? 1 : -1;
       let prev = null;
       for (let s = 6; s < len - 4; s += 27) {
@@ -183,6 +188,7 @@ export function furnish(m, env) {
         if (off < 1.6 && !two) continue;
         const x = a.x + a.dz * off * side, z = a.z - a.dx * off * side;
         if (nearBuilding(x, z, two ? 0.5 : 1.0) || taken(x, z, 3) || inWater(x, z)) continue;
+        if (D < 1 && rnd() > (D < 0.6 ? D * 0.6 : D)) continue;
         m.chunk(x, z);
         const ry = Math.atan2(-a.dz, a.dx) + (side < 0 ? Math.PI : 0) + (two ? (rnd() - 0.5) * 0.5 + 1.2 : (rnd() - 0.5) * 0.08);
         m.at(x, 0, z, ry, () => {
@@ -270,7 +276,7 @@ export function furnish(m, env) {
   // ---- weeds and grass on open plots ----------------------------------------
   {
     const { play } = data.meta;
-    for (let i = 0; i < 2600; i++) {
+    for (let i = 0; i < 2600 * D; i++) {
       const x = play.minX - 100 + rnd() * (play.maxX - play.minX + 200), z = play.minZ - 100 + rnd() * (play.maxZ - play.minZ + 200);
       const r = 2.5 + rnd() * 7;
       if (nearBuilding(x, z, Math.min(7.5, r * 0.8)) || onRoad(x, z, r * 0.6) || ctx.onTrack(x, z, r) || inWater(x, z) || inPaved(x, z)) continue;
@@ -280,6 +286,7 @@ export function furnish(m, env) {
   }
 
   // ---- compounds: trees tucked in beside buildings --------------------------
+  await step(0.8);
   for (const b of data.buildings) {
     const p = b.pts;
     if (p.length < 3 || !ctx.detailAt(p[0][0], p[0][1])) continue;
@@ -298,13 +305,14 @@ export function furnish(m, env) {
 
   // ---- open land -----------------------------------------------------------
   const { draw, play } = data.meta;
-  for (let i = 0; i < 7000; i++) {
+  await step(0.86);
+  for (let i = 0; i < 7000 * Math.max(0.5, D); i++) {
     const x = play.minX + rnd() * (play.maxX - play.minX), z = play.minZ + rnd() * (play.maxZ - play.minZ);
     if (!free(x, z, 2.2, 2)) continue;
     const k = rnd();
     plant(x, z, k < 0.3 ? 'bush' : k < 0.46 ? 'palm' : k < 0.6 ? 'rain' : 'round', 0.8 + rnd() * 0.7, false);
   }
-  for (let i = 0; i < 9000; i++) {
+  for (let i = 0; i < 9000 * (D < 0.6 ? 0.3 : 1); i++) {
     const x = draw.minX + rnd() * (draw.maxX - draw.minX), z = draw.minZ + rnd() * (draw.maxZ - draw.minZ);
     if (ctx.detailAt(x, z) || !free(x, z, 2.4, 2.5)) continue;
     const k = rnd();

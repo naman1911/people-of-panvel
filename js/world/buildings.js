@@ -39,7 +39,7 @@ export function buildBuilding(m, b, p, ctx) {
   const [cx, cz] = centroid(p);
   m.chunk(cx, cz);
   const n = p.length;
-  const detail = ctx.detailAt(cx, cz);
+  const detail = ctx.detailAt(cx, cz) && ctx.density >= 0.75;
 
   // Open-sided canopies (station and bus-stand roofs).
   if (b.k === 'c') {

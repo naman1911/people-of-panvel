@@ -8,9 +8,12 @@ import { mulberry32 } from '../util.js';
 
 const OLD_CORE = [-560, 380, 430];
 
-export function buildTown(data, lib, tier, hooks = {}) {
+export async function buildTown(data, lib, tier, hooks = {}) {
   const rng = mulberry32(1852);
   const m = new Mesher(lib, 240, rng);
+  m.release = true;
+  const step = hooks.progress || (async () => {});
+  const M0 = tier.margin ?? 430;
   const { play, draw } = data.meta;
 
   const walls = new SegGrid(16);
@@ -23,6 +26,9 @@ export function buildTown(data, lib, tier, hooks = {}) {
     walls,
     solids: [], // [x, z, r] round obstacles (pillars, trunks, poles)
     rng,
+    // how much of the surroundings and how much street dressing this device gets
+    density: tier.detail ?? 1,
+    drawAt: (x, z) => x > play.minX - M0 && x < play.maxX + M0 && z > play.minZ - M0 && z < play.maxZ + M0,
     detailAt: (x, z) => x > play.minX - 120 && x < play.maxX + 120 && z > play.minZ - 120 && z < play.maxZ + 120,
     inTown: (x, z) => x > play.minX - 60 && x < play.maxX + 60 && z > play.minZ - 60 && z < play.maxZ + 60,
     isOldTown: (x, z) => Math.hypot(x - OLD_CORE[0], z - OLD_CORE[1]) < OLD_CORE[2],
@@ -120,19 +126,26 @@ export function buildTown(data, lib, tier, hooks = {}) {
   }
 
   // ---- streets and rail ----------------------------------------------------
+  await step(0.06);
   const roadInfo = buildRoads(m, data, ctx);
+  await step(0.2);
   buildRails(m, data, ctx);
   const platforms = buildPlatforms(m, data, ctx);
+  await step(0.26);
 
   // ---- buildings -----------------------------------------------------------
   const footprints = new PolyGrid(40);
+  let done = 0;
   for (const b of data.buildings) {
     const p = unpack(b.p);
     b.pts = p;
+    if (++done % 350 === 0) await step(0.26 + 0.3 * (done / data.buildings.length));
+    if (!ctx.drawAt(p[0][0], p[0][1])) continue;
     footprints.add(p, b);
     if (hooks.special && hooks.special(m, b, p, ctx)) continue;
     buildBuilding(m, b, p, ctx);
   }
+  await step(0.56);
 
   // ---- compound walls ------------------------------------------------------
   for (const w of data.walls) {
@@ -154,8 +167,9 @@ export function buildTown(data, lib, tier, hooks = {}) {
     }
   }
 
-  if (hooks.furnish) hooks.furnish(m, { data, ctx, greens, footprints, lakes, platforms, roadInfo, unpackCache, unpack });
+  if (hooks.furnish) await hooks.furnish(m, { data, ctx, greens, footprints, lakes, platforms, roadInfo, unpackCache, unpack, step });
 
+  await step(0.92);
   const group = m.build(true);
   return { group, ctx, walls, greens, footprints, lakes, platforms, waterPolys, roadInfo, play, draw, stats: group.userData.stats };
 }

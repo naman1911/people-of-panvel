@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { Water } from '../../vendor/addons/objects/Water.js';
 import { waterNormals } from '../gfx/surfaces.js';
-import { tex } from '../gfx/texkit.js';
+import { tex, setNormals } from '../gfx/texkit.js';
 
 const Y = 0.09;
 
@@ -56,6 +56,7 @@ function mirrorGeometry(polys) {
 }
 
 export function createWater(polys, tier, scene) {
+  setNormals(true);
   const normals = tex(waterNormals(), { srgb: false });
   const group = new THREE.Group();
   const geo = flatGeometry(polys);

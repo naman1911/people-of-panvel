@@ -31,7 +31,11 @@ export function addSign(lines, o) {
   for (const l of lines) {
     let size = l.size;
     g.font = `${l.weight || 800} ${size}px ${FONT}`;
-    while (g.measureText(l.text).width > W * 0.92 && size > 8) g.font = `${l.weight || 800} ${--size}px ${FONT}`;
+    const tw = g.measureText(l.text).width;
+    if (tw > W * 0.92) {
+      size = Math.max(8, Math.floor((size * W * 0.92) / tw));
+      g.font = `${l.weight || 800} ${size}px ${FONT}`;
+    }
     g.fillStyle = l.color || '#111';
     g.fillText(l.text, W / 2, y + l.size * 0.56);
     y += l.size * 1.12;

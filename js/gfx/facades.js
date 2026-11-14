@@ -2,7 +2,10 @@
 // windows, curtains, AC units and drying clothes do not repeat too obviously.
 // Walls are near-white; each building tints them with its own paint colour.
 
-import { cv, N, blend, normalFromHeight, rgba, grey, mulberry32 } from './texkit.js';
+import { cv, heightCv, N, blend as paint, normalFromHeight, rgba, grey, mulberry32 } from './texkit.js';
+
+// drawing onto a height map is skipped when normal maps are off (its context is a 1-pixel sink)
+const blend = (g, ...rest) => (g.canvas.width === 1 ? undefined : paint(g, ...rest));
 
 const SIZE = 1024, CELL = 256;
 const WARM = ['#ffcf8a', '#ffe0ac', '#ffd9a0', '#ffc474'];
@@ -14,7 +17,7 @@ class Kit {
   constructor(seed) {
     this.rnd = mulberry32(seed);
     [this.a, this.A] = cv(SIZE); // albedo
-    [this.h, this.H] = cv(SIZE); // height
+    [this.h, this.H] = heightCv(SIZE); // height
     [this.e, this.E] = cv(SIZE / 2); // emissive
     [this.r, this.R] = cv(SIZE / 2); // roughness
     this.E.scale(0.5, 0.5);
@@ -791,7 +794,7 @@ function blend2(A, x, y, w, h) {
 export function shopAtlas() {
   const size = SC * SHOP_GRID;
   const [a, A] = cv(size);
-  const [hc, H] = cv(size);
+  const [hc, H] = heightCv(size);
   const [e, E] = cv(size);
   E.fillStyle = '#000';
   E.fillRect(0, 0, size, size);
@@ -804,6 +807,6 @@ export function shopAtlas() {
     g.drawImage(src, 0, 0, size / 2, size / 2);
     return c;
   };
-  return { map: a, normalMap: normalFromHeight(half(hc), 2.2), emissiveMap: half(e) };
+  return { map: a, normalMap: hc.width > 1 ? normalFromHeight(half(hc), 2.2) : null, emissiveMap: half(e) };
 }
 export const SHOP_COUNT = SHOPS.length;

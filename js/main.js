@@ -30,7 +30,19 @@ const canvas = document.getElementById('city');
 const bootMsg = document.getElementById('boot-msg');
 const say = (s) => (bootMsg.textContent = s);
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
+// Let the browser paint without waiting for a frame or a (possibly throttled) timer.
+const channel = new MessageChannel();
+const breathe = () => new Promise((r) => {
+  channel.port1.onmessage = () => r();
+  channel.port2.postMessage(0);
+});
 const REPO = 'https://github.com/naman1911/people-of-panvel';
+
+const marks = [['start', performance.now()]];
+const mark = (name) => marks.push([name, performance.now()]);
+
+// start the map download straight away; textures are painted while it arrives
+const dataPromise = fetch('data/panvel.json');
 
 async function start() {
   const tierName = params.get('q') || store.get('quality') || pickTier();
@@ -40,28 +52,48 @@ async function start() {
   camera.layers.enable(1); // layer 1: small detail the lake mirror skips
 
   say(t('loading'));
-  await Promise.all([
-    document.fonts.load('800 40px "Baloo 2"', 'पनवेल ABC'),
-    document.fonts.load('700 20px "Baloo 2"', 'पनवेल ABC'),
-    document.fonts.load('600 16px "Mukta"', 'पनवेल ABC'),
-  ]).catch(() => {});
+  // Signboards are painted with these fonts; if the network is slow, carry on with system fonts.
+  await Promise.race([
+    Promise.all([
+      document.fonts.load('800 40px "Baloo 2"', 'पनवेल ABC'),
+      document.fonts.load('700 20px "Baloo 2"', 'पनवेल ABC'),
+      document.fonts.load('600 16px "Mukta"', 'पनवेल ABC'),
+    ]).catch(() => {}),
+    new Promise((r) => setTimeout(r, 2500)),
+  ]);
+  const bar = document.getElementById('boot-bar');
+  let lastYield = performance.now();
+  const progress = async (f) => {
+    if (performance.now() - lastYield < 140) return;
+    if (bar) bar.style.width = Math.round(8 + f * 92) + '%';
+    await breathe();
+    lastYield = performance.now();
+  };
+  await progress(0);
+  mark('fonts');
   await nextFrame();
   const lib = buildMaterials(tierName);
+  mark('textures');
 
-  const data = await (await fetch('data/panvel.json')).json();
+  const data = await (await dataPromise).json();
+  mark('map data');
   await nextFrame();
   const t0 = performance.now();
-  const town = buildTown(data, lib, R.tier, {
+  const town = await buildTown(data, lib, R.tier, {
     special,
-    furnish(m, env) {
-      furnish(m, env);
+    progress,
+    async furnish(m, env) {
+      await furnish(m, env);
+      await env.step(0.88);
       placeSetpieces(m, env);
       placeNames(m, env);
     },
   });
+  await progress(0.96);
   scene.add(town.group, signGroup);
   signGroup.traverse((o) => o.layers.set(1));
   const chunks = town.group.children.filter((c) => c.userData.cx !== undefined).map((c) => ({ c, detail: c.children.filter((mesh) => mesh.userData.detail), shown: true }));
+  mark('town');
   console.info(`town built in ${Math.round(performance.now() - t0)} ms`, JSON.stringify(town.stats));
 
   const atmo = new Atmosphere(scene, R.renderer, lib, R.tier);
@@ -189,7 +221,10 @@ async function start() {
 
   const game = {
     input, atmo, residents, player, strays, store,
-    map: createMap(data),
+    // the 2-D map is drawn the first time it is needed, not during loading
+    get map() {
+      return (this._map ||= createMap(data));
+    },
     streetMr: (n) => STREET_MR[n],
     firstPerson: () => rig.fp,
     toggleView() {
@@ -507,9 +542,15 @@ async function start() {
       window.__ready = true;
       return;
     }
+    if (frames === 1) {
+      mark('first frame');
+      window.__marks = marks.map(([n, t], i) => `${n} ${Math.round(t - (i ? marks[i - 1][1] : 0))}`).join(' | ');
+      console.info('load: ' + window.__marks);
+    }
     if (frames === 3) window.__ready = true;
     requestAnimationFrame(frame);
   }
+  mark('entities');
   frame();
   window.__pop = { scene, camera, R, atmo, town, lib, world, player, rig, residents, game, ui, rickshaws, spots, train, walkers };
   void mulberry32;

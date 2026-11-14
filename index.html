@@ -26,7 +26,59 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Mukta:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
+  <!-- The import map must come before anything that loads a module. -->
   <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+  <!-- preload:start -->
+  <link rel="preload" href="data/panvel.json" as="fetch" crossorigin="anonymous" />
+  <link rel="modulepreload" href="vendor/three.module.min.js" />
+  <link rel="modulepreload" href="js/data/people.js" />
+  <link rel="modulepreload" href="js/data/places.js" />
+  <link rel="modulepreload" href="js/data/streets.js" />
+  <link rel="modulepreload" href="js/entities/actors.js" />
+  <link rel="modulepreload" href="js/entities/person.js" />
+  <link rel="modulepreload" href="js/gfx/facades.js" />
+  <link rel="modulepreload" href="js/gfx/materials.js" />
+  <link rel="modulepreload" href="js/gfx/renderer.js" />
+  <link rel="modulepreload" href="js/gfx/sky.js" />
+  <link rel="modulepreload" href="js/gfx/surfaces.js" />
+  <link rel="modulepreload" href="js/gfx/texkit.js" />
+  <link rel="modulepreload" href="js/i18n.js" />
+  <link rel="modulepreload" href="js/input.js" />
+  <link rel="modulepreload" href="js/main.js" />
+  <link rel="modulepreload" href="js/minimap.js" />
+  <link rel="modulepreload" href="js/sfx.js" />
+  <link rel="modulepreload" href="js/store.js" />
+  <link rel="modulepreload" href="js/ui.js" />
+  <link rel="modulepreload" href="js/util.js" />
+  <link rel="modulepreload" href="js/world/buildings.js" />
+  <link rel="modulepreload" href="js/world/geom.js" />
+  <link rel="modulepreload" href="js/world/mesher.js" />
+  <link rel="modulepreload" href="js/world/models.js" />
+  <link rel="modulepreload" href="js/world/naming.js" />
+  <link rel="modulepreload" href="js/world/props.js" />
+  <link rel="modulepreload" href="js/world/roads.js" />
+  <link rel="modulepreload" href="js/world/setpieces.js" />
+  <link rel="modulepreload" href="js/world/signs.js" />
+  <link rel="modulepreload" href="js/world/town.js" />
+  <link rel="modulepreload" href="js/world/water.js" />
+  <link rel="modulepreload" href="js/world/world.js" />
+  <link rel="modulepreload" href="vendor/addons/math/SimplexNoise.js" />
+  <link rel="modulepreload" href="vendor/addons/objects/Sky.js" />
+  <link rel="modulepreload" href="vendor/addons/objects/Water.js" />
+  <link rel="modulepreload" href="vendor/addons/postprocessing/EffectComposer.js" />
+  <link rel="modulepreload" href="vendor/addons/postprocessing/GTAOPass.js" />
+  <link rel="modulepreload" href="vendor/addons/postprocessing/MaskPass.js" />
+  <link rel="modulepreload" href="vendor/addons/postprocessing/OutputPass.js" />
+  <link rel="modulepreload" href="vendor/addons/postprocessing/Pass.js" />
+  <link rel="modulepreload" href="vendor/addons/postprocessing/RenderPass.js" />
+  <link rel="modulepreload" href="vendor/addons/postprocessing/ShaderPass.js" />
+  <link rel="modulepreload" href="vendor/addons/postprocessing/UnrealBloomPass.js" />
+  <link rel="modulepreload" href="vendor/addons/shaders/CopyShader.js" />
+  <link rel="modulepreload" href="vendor/addons/shaders/GTAOShader.js" />
+  <link rel="modulepreload" href="vendor/addons/shaders/LuminosityHighPassShader.js" />
+  <link rel="modulepreload" href="vendor/addons/shaders/OutputShader.js" />
+  <link rel="modulepreload" href="vendor/addons/shaders/PoissonDenoiseShader.js" />
+  <!-- preload:end -->
 </head>
 <body>
   <canvas id="city" tabindex="0" aria-label="3D view of Panvel"></canvas>
@@ -36,6 +88,7 @@
     <div class="boot-kicker">PEOPLE OF</div>
     <h1>PANVEL</h1>
     <p id="boot-msg">Building the town…</p>
+    <div class="boot-track"><i id="boot-bar"></i></div>
   </div>
   <noscript><p style="padding:24px;color:#fff">People of Panvel needs JavaScript and WebGL to run.</p></noscript>
   <script type="module" src="js/main.js"></script>

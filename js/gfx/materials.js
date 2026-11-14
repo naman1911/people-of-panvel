@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import * as SF from './surfaces.js';
 import { FACADES, shopAtlas } from './facades.js';
-import { tex } from './texkit.js';
+import { tex, shrink, setNormals } from './texkit.js';
 
 /**
  * Each entry: [surface generator, metres per texture repeat, roughness, options].
@@ -28,14 +28,18 @@ const SURFACES = {
 
 export function buildMaterials(quality) {
   const lib = {};
+  // Phones get half-size textures and no normal maps: a quarter of the memory and far less work.
+  const small = quality === 'low';
+  setNormals(!small);
+  const fit = (c, f = 2) => (small && c ? shrink(c, f) : c);
   const wetList = [];
   const nightList = [];
 
   for (const [name, [gen, scale, rough, o]] of Object.entries(SURFACES)) {
     const s = gen();
     const m = new THREE.MeshStandardMaterial({
-      map: tex(s.map),
-      normalMap: tex(s.normalMap, { srgb: false }),
+      map: tex(fit(s.map)),
+      normalMap: s.normalMap ? tex(s.normalMap, { srgb: false }) : null,
       roughness: rough,
       metalness: o.metalness || 0,
       vertexColors: true,
@@ -58,7 +62,7 @@ export function buildMaterials(quality) {
   {
     const s = SF.ballast();
     lib.ballast = new THREE.MeshStandardMaterial({
-      map: tex(s.map), normalMap: tex(s.normalMap, { srgb: false }), roughness: 0.95, vertexColors: true,
+      map: tex(fit(s.map)), normalMap: s.normalMap ? tex(s.normalMap, { srgb: false }) : null, roughness: 0.95, vertexColors: true,
       polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
     });
   }
@@ -67,10 +71,10 @@ export function buildMaterials(quality) {
   for (const [name, gen] of Object.entries(FACADES)) {
     const s = gen(7 + name.length * 13);
     const m = new THREE.MeshStandardMaterial({
-      map: tex(s.map),
-      normalMap: tex(s.normalMap, { srgb: false }),
-      roughnessMap: tex(s.roughnessMap, { srgb: false }),
-      emissiveMap: tex(s.emissiveMap),
+      map: tex(fit(s.map)),
+      normalMap: s.normalMap ? tex(s.normalMap, { srgb: false }) : null,
+      roughnessMap: tex(fit(s.roughnessMap), { srgb: false }),
+      emissiveMap: tex(fit(s.emissiveMap)),
       emissive: 0xffffff,
       emissiveIntensity: 0,
       roughness: 1,
@@ -84,9 +88,9 @@ export function buildMaterials(quality) {
 
   const sa = shopAtlas();
   lib.shop = new THREE.MeshStandardMaterial({
-    map: tex(sa.map, { repeat: false }),
-    normalMap: tex(sa.normalMap, { srgb: false, repeat: false }),
-    emissiveMap: tex(sa.emissiveMap, { repeat: false }),
+    map: tex(fit(sa.map), { repeat: false }),
+    normalMap: sa.normalMap ? tex(sa.normalMap, { srgb: false, repeat: false }) : null,
+    emissiveMap: tex(fit(sa.emissiveMap), { repeat: false }),
     emissive: 0xffffff,
     emissiveIntensity: 0,
     roughness: 0.8,

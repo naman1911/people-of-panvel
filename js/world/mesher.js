@@ -17,6 +17,7 @@ const _e = new THREE.Euler();
 const _c = new THREE.Color();
 const _tmp = new THREE.Matrix4();
 
+const colorCache = new Map();
 const cache = new Map();
 function cached(key, make) {
   let g = cache.get(key);
@@ -63,6 +64,9 @@ class Buf {
 
 /** Small street-level detail: skipped by the lake mirror and hidden on far-away blocks. */
 export const DETAIL = new Set(['flat', 'gloss', 'glow', 'pool', 'mark', 'bark', 'wood', 'stone', 'shop']);
+function freeArray() {
+  this.array = null;
+}
 const NO_SHADOW = new Set(['asphalt', 'paver', 'earth', 'grass', 'mark', 'pool', 'glow', 'ballast']);
 
 export class Mesher {
@@ -73,6 +77,7 @@ export class Mesher {
     this.chunks = new Map();
     this.stack = [new THREE.Matrix4()];
     this.cur = null;
+    this.release = false;
     this.chunk(0, 0);
   }
 
@@ -104,75 +109,72 @@ export class Mesher {
   }
 
   _color(color, jitter) {
-    _c.set(color);
-    if (jitter) _c.multiplyScalar(1 + (this.rng() - 0.5) * jitter);
-    return [Math.min(255, _c.r * 255) | 0, Math.min(255, _c.g * 255) | 0, Math.min(255, _c.b * 255) | 0];
+    let c = colorCache.get(color);
+    if (!c) {
+      _c.set(color);
+      colorCache.set(color, (c = [_c.r * 255, _c.g * 255, _c.b * 255]));
+    }
+    const k = jitter ? 1 + (this.rng() - 0.5) * jitter : 1;
+    return [Math.min(255, c[0] * k) | 0, Math.min(255, c[1] * k) | 0, Math.min(255, c[2] * k) | 0];
   }
 
   /** Append a cached geometry, transformed by `local` within the current frame. */
   add(geo, local, color, layer = 'flat', o) {
     if (layer === 'glassDark') color = '#141d24';
     const b = this._buf(layer);
-    const pa = geo.attributes.position, na = geo.attributes.normal, ua = geo.attributes.uv;
-    const count = pa.count;
+    const pa = geo.attributes.position.array, na = geo.attributes.normal?.array, ua = geo.attributes.uv?.array;
+    const count = pa.length / 3;
     b.ensure(count);
     _m.multiplyMatrices(this.top, local);
-    const smooth = o?.smooth && na;
-    if (smooth) _nm.getNormalMatrix(_m);
+    const e = _m.elements;
+    const m00 = e[0], m01 = e[4], m02 = e[8], m03 = e[12], m10 = e[1], m11 = e[5], m12 = e[9], m13 = e[13], m20 = e[2], m21 = e[6], m22 = e[10], m23 = e[14];
+    const smooth = !!(o && o.smooth && na);
+    let n00 = 0, n01 = 0, n02 = 0, n10 = 0, n11 = 0, n12 = 0, n20 = 0, n21 = 0, n22 = 0;
+    if (smooth) {
+      const ne = _nm.getNormalMatrix(_m).elements;
+      n00 = ne[0]; n01 = ne[3]; n02 = ne[6]; n10 = ne[1]; n11 = ne[4]; n12 = ne[7]; n20 = ne[2]; n21 = ne[5]; n22 = ne[8];
+    }
     const [r, g, bl] = this._color(color, o?.jitter);
     const world = WORLD_UV.has(layer);
     const s = world ? this.lib[layer].userData.uvScale : 1;
     const P = b.pos, Nn = b.nor, U = b.uv, C = b.col;
     let vi = b.n;
     for (let i = 0; i < count; i += 3) {
-      // transform the triangle
-      const base = vi * 3;
-      for (let k = 0; k < 3; k++) {
-        _p.fromBufferAttribute(pa, i + k).applyMatrix4(_m);
-        P[base + k * 3] = _p.x;
-        P[base + k * 3 + 1] = _p.y;
-        P[base + k * 3 + 2] = _p.z;
+      const base = vi * 3, src = i * 3;
+      for (let k = 0; k < 9; k += 3) {
+        const x = pa[src + k], y = pa[src + k + 1], z = pa[src + k + 2];
+        P[base + k] = m00 * x + m01 * y + m02 * z + m03;
+        P[base + k + 1] = m10 * x + m11 * y + m12 * z + m13;
+        P[base + k + 2] = m20 * x + m21 * y + m22 * z + m23;
       }
       const ax = P[base], ay = P[base + 1], az = P[base + 2];
       const e1x = P[base + 3] - ax, e1y = P[base + 4] - ay, e1z = P[base + 5] - az;
       const e2x = P[base + 6] - ax, e2y = P[base + 7] - ay, e2z = P[base + 8] - az;
       let nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x;
-      const nl = Math.hypot(nx, ny, nz) || 1;
-      nx /= nl;
-      ny /= nl;
-      nz /= nl;
-      const anx = Math.abs(nx), any = Math.abs(ny), anz = Math.abs(nz);
+      const nl = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+      nx /= nl; ny /= nl; nz /= nl;
+      const anx = nx < 0 ? -nx : nx, any = ny < 0 ? -ny : ny, anz = nz < 0 ? -nz : nz;
+      const uvMode = any >= anx && any >= anz ? 0 : anx >= anz ? 1 : 2;
       for (let k = 0; k < 3; k++) {
-        const v = vi + k;
+        const v = vi + k, v3 = v * 3, v2 = v * 2;
         if (smooth) {
-          _n.fromBufferAttribute(na, i + k).applyMatrix3(_nm).normalize();
-          Nn[v * 3] = _n.x * 127;
-          Nn[v * 3 + 1] = _n.y * 127;
-          Nn[v * 3 + 2] = _n.z * 127;
+          const sx = na[src + k * 3], sy = na[src + k * 3 + 1], sz = na[src + k * 3 + 2];
+          let qx = n00 * sx + n01 * sy + n02 * sz, qy = n10 * sx + n11 * sy + n12 * sz, qz = n20 * sx + n21 * sy + n22 * sz;
+          const ql = 127 / (Math.sqrt(qx * qx + qy * qy + qz * qz) || 1);
+          Nn[v3] = qx * ql; Nn[v3 + 1] = qy * ql; Nn[v3 + 2] = qz * ql;
         } else {
-          Nn[v * 3] = nx * 127;
-          Nn[v * 3 + 1] = ny * 127;
-          Nn[v * 3 + 2] = nz * 127;
+          Nn[v3] = nx * 127; Nn[v3 + 1] = ny * 127; Nn[v3 + 2] = nz * 127;
         }
-        const px = P[v * 3], py = P[v * 3 + 1], pz = P[v * 3 + 2];
         if (world) {
-          if (any >= anx && any >= anz) {
-            U[v * 2] = px * s;
-            U[v * 2 + 1] = -pz * s;
-          } else if (anx >= anz) {
-            U[v * 2] = pz * s;
-            U[v * 2 + 1] = py * s;
-          } else {
-            U[v * 2] = px * s;
-            U[v * 2 + 1] = py * s;
-          }
+          const px = P[v3], py = P[v3 + 1], pz = P[v3 + 2];
+          if (uvMode === 0) { U[v2] = px * s; U[v2 + 1] = -pz * s; }
+          else if (uvMode === 1) { U[v2] = pz * s; U[v2 + 1] = py * s; }
+          else { U[v2] = px * s; U[v2 + 1] = py * s; }
         } else if (ua) {
-          U[v * 2] = ua.getX(i + k);
-          U[v * 2 + 1] = ua.getY(i + k);
+          U[v2] = ua[(i + k) * 2];
+          U[v2 + 1] = ua[(i + k) * 2 + 1];
         }
-        C[v * 3] = r;
-        C[v * 3 + 1] = g;
-        C[v * 3 + 2] = bl;
+        C[v3] = r; C[v3 + 1] = g; C[v3 + 2] = bl;
       }
       vi += 3;
     }
@@ -374,12 +376,14 @@ export class Mesher {
         const mat = this.lib[layer];
         if (!mat) throw new Error('No material for layer ' + layer);
         const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.BufferAttribute(b.pos.slice(0, b.n * 3), 3));
-        geo.setAttribute('normal', new THREE.BufferAttribute(b.nor.slice(0, b.n * 3), 3, true));
-        geo.setAttribute('uv', new THREE.BufferAttribute(b.uv.slice(0, b.n * 2), 2));
-        geo.setAttribute('color', new THREE.BufferAttribute(b.col.slice(0, b.n * 3), 3, true));
+        geo.setAttribute('position', new THREE.BufferAttribute(b.pos.subarray(0, b.n * 3), 3));
+        geo.setAttribute('normal', new THREE.BufferAttribute(b.nor.subarray(0, b.n * 3), 3, true));
+        geo.setAttribute('uv', new THREE.BufferAttribute(b.uv.subarray(0, b.n * 2), 2));
+        geo.setAttribute('color', new THREE.BufferAttribute(b.col.subarray(0, b.n * 3), 3, true));
         geo.computeBoundingSphere();
         geo.computeBoundingBox();
+        // The town never changes, so drop the JS copy of each buffer once it is on the GPU.
+        if (this.release) for (const k in geo.attributes) geo.attributes[k].onUpload(freeArray);
         const mesh = new THREE.Mesh(geo, mat);
         mesh.name = layer;
         mesh.castShadow = shadows && !NO_SHADOW.has(layer);

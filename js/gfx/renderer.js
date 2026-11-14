@@ -10,16 +10,18 @@ import { GTAOPass } from '../../vendor/addons/postprocessing/GTAOPass.js';
 import { setMaxAniso } from './texkit.js';
 
 export const TIERS = {
-  low: { pixelRatio: 1, shadow: 1024, shadowRange: 70, ao: false, bloom: false, reflect: false, msaa: 0, far: 750, detail: 0.5, detailRange: 220 },
-  medium: { pixelRatio: 1.25, shadow: 2048, shadowRange: 100, ao: false, bloom: true, reflect: false, msaa: 4, far: 1100, detail: 0.8, detailRange: 300 },
-  high: { pixelRatio: 1.5, shadow: 4096, shadowRange: 130, ao: true, bloom: true, reflect: true, msaa: 4, far: 1500, detail: 1, detailRange: 380 },
+  low: { pixelRatio: 1, shadow: 1024, shadowRange: 70, ao: false, bloom: false, reflect: false, msaa: 0, far: 750, detail: 0.45, detailRange: 220, margin: 110 },
+  medium: { pixelRatio: 1.25, shadow: 2048, shadowRange: 100, ao: false, bloom: true, reflect: false, msaa: 4, far: 1100, detail: 0.8, detailRange: 300, margin: 280 },
+  high: { pixelRatio: 1.5, shadow: 4096, shadowRange: 130, ao: true, bloom: true, reflect: true, msaa: 4, far: 1500, detail: 1, detailRange: 380, margin: 430 },
 };
 
 export function pickTier() {
   const coarse = window.matchMedia?.('(pointer: coarse)').matches;
   const cores = navigator.hardwareConcurrency || 4;
   const mem = navigator.deviceMemory || 4;
-  if (coarse) return cores >= 8 && mem >= 6 ? 'medium' : 'low';
+  // Phones and tablets always start light: it loads several times faster and uses a third of the memory.
+  // Anyone who wants more can raise it under Help.
+  if (coarse) return 'low';
   if (cores <= 4 || mem < 4) return 'medium';
   // Integrated and software GPUs get the lighter tier; the full effects need a real graphics card.
   try {

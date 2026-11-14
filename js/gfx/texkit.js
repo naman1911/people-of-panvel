@@ -101,27 +101,51 @@ export function blend(g, src, mode, alpha, scale = 1, w = g.canvas.width, h = g.
   g.restore();
 }
 
+let wantNormals = true;
+const noop = () => sink;
+const sink = new Proxy(noop, {
+  get: (t, k) => (k === 'canvas' ? { width: 1, height: 1, getContext: () => sink } : k === Symbol.toPrimitive ? () => 0 : sink),
+  set: () => true,
+  apply: () => sink,
+});
+/** A canvas + context for a height map. When normal maps are off this is a sink that ignores all drawing. */
+export function heightCv(w, h = w) {
+  if (wantNormals) return cv(w, h);
+  return [sink.canvas, sink];
+}
+export const normalsOn = () => wantNormals;
+/** Turn normal-map generation off (phones). Generators then return null for normal maps. */
+export const setNormals = (on) => (wantNormals = on);
+
 /** Tangent-space normal map from a greyscale height canvas (wraps at edges). */
 export function normalFromHeight(hc, strength = 2) {
+  if (!wantNormals) return null;
   const w = hc.width, h = hc.height;
   const src = hc.getContext('2d').getImageData(0, 0, w, h).data;
   const [c, g] = cv(w, h);
   const img = g.createImageData(w, h);
-  const d = img.data;
-  const H = (x, y) => src[(((y + h) % h) * w + ((x + w) % w)) * 4];
+  const d = new Uint32Array(img.data.buffer);
+  const k = strength / 255;
   for (let y = 0; y < h; y++) {
+    const up = ((y + h - 1) % h) * w, dn = ((y + 1) % h) * w, row = y * w;
     for (let x = 0; x < w; x++) {
-      const dx = (H(x - 1, y) - H(x + 1, y)) * (strength / 255);
-      const dy = (H(x, y - 1) - H(x, y + 1)) * (strength / 255);
-      const il = 1 / Math.hypot(dx, dy, 1);
-      const i = (y * w + x) * 4;
-      d[i] = (dx * il * 0.5 + 0.5) * 255;
-      d[i + 1] = (-dy * il * 0.5 + 0.5) * 255;
-      d[i + 2] = (il * 0.5 + 0.5) * 255;
-      d[i + 3] = 255;
+      const l = x === 0 ? w - 1 : x - 1, r = x === w - 1 ? 0 : x + 1;
+      const dx = (src[(row + l) << 2] - src[(row + r) << 2]) * k;
+      const dy = (src[(up + x) << 2] - src[(dn + x) << 2]) * k;
+      const il = 1 / Math.sqrt(dx * dx + dy * dy + 1);
+      // little-endian RGBA
+      d[row + x] = 0xff000000 | (((il * 0.5 + 0.5) * 255) << 16) | (((-dy * il * 0.5 + 0.5) * 255) << 8) | ((dx * il * 0.5 + 0.5) * 255);
     }
   }
   g.putImageData(img, 0, 0);
+  return c;
+}
+
+/** Half-size copy of a canvas (used to shrink textures on phones). */
+export function shrink(src, factor = 2) {
+  const [c, g] = cv(Math.max(1, src.width / factor) | 0, Math.max(1, src.height / factor) | 0);
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(src, 0, 0, c.width, c.height);
   return c;
 }
 

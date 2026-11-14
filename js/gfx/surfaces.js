@@ -1,7 +1,10 @@
 // Procedural ground, wall and roof surfaces. Each returns
 // { map, normalMap, [roughnessMap] } as canvases, sized in px.
 
-import { cv, N, blend, normalFromHeight, rgba, grey, mulberry32 } from './texkit.js';
+import { cv, heightCv, normalsOn, N, blend as paint, normalFromHeight, rgba, grey, mulberry32 } from './texkit.js';
+
+// blending onto a height map is skipped when normal maps are off
+const blend = (g, ...rest) => (!normalsOn() && g !== undefined && g.canvas && g.canvas.width === 1 ? undefined : paint(g, ...rest));
 
 const S = 512;
 
@@ -10,6 +13,15 @@ function base(color, size = S) {
   g.fillStyle = color;
   g.fillRect(0, 0, size, size);
   return [c, g];
+}
+
+/** Height-map canvas: real when normal maps are wanted, otherwise a sink that ignores drawing. */
+function hbase(color, size = S) {
+  if (!normalsOn()) {
+    const [c, g] = heightCv(size);
+    return [c, g];
+  }
+  return base(color, size);
 }
 
 /** Draw something that must wrap at the texture edges: fn is called for the 9 neighbours as needed. */
@@ -49,7 +61,7 @@ export function asphalt() {
     }
     g.stroke();
   }
-  const [hc, hg] = base('#808080');
+  const [hc, hg] = hbase('#808080');
   blend(hg, n.fine, 'overlay', 0.9, 1);
   blend(hg, n.hi, 'overlay', 0.5, 1);
   // Puddle map: where rain collects. Stored in the roughness texture.
@@ -63,7 +75,7 @@ export function pavers() {
   const rnd = mulberry32(202);
   const n = N();
   const [c, g] = base('#8f8a82');
-  const [hc, hg] = base('#404040');
+  const [hc, hg] = hbase('#404040');
   const bw = 32, bh = 16; // 512 px = 3.2 m  → 20 x 10 cm blocks
   for (let row = 0; row < S / bh; row++) {
     for (let col = -1; col < S / bw + 1; col++) {
@@ -94,7 +106,7 @@ export function concrete() {
   blend(g, n.mid, 'overlay', 0.3, 1);
   blend(g, n.fine, 'overlay', 0.35, 1);
   blend(g, n.streak, 'multiply', 0.12, 2);
-  const [hc, hg] = base('#808080');
+  const [hc, hg] = hbase('#808080');
   blend(hg, n.fine, 'overlay', 0.6, 1);
   // expansion joints every 2.56 m (texture spans 5.12 m)
   for (const gg of [g, hg]) {
@@ -126,7 +138,7 @@ export function earth() {
     g.arc(rnd() * S, rnd() * S, 0.6 + rnd() * 1.5, 0, 6.3);
     g.fill();
   }
-  const [hc, hg] = base('#808080');
+  const [hc, hg] = hbase('#808080');
   blend(hg, n.mid, 'overlay', 0.6, 1);
   blend(hg, n.fine, 'overlay', 0.7, 1);
   return { map: c, normalMap: normalFromHeight(hc, 1.2) };
@@ -163,7 +175,7 @@ export function grass() {
     g.stroke();
   }
   blend(g, n.fine, 'overlay', 0.3, 1);
-  const [hc, hg] = base('#808080');
+  const [hc, hg] = hbase('#808080');
   blend(hg, n.hi, 'overlay', 0.9, 1);
   blend(hg, n.fine, 'overlay', 0.8, 1);
   return { map: c, normalMap: normalFromHeight(hc, 1.8) };
@@ -177,7 +189,7 @@ export function plaster() {
   blend(g, n.mid, 'overlay', 0.18, 1);
   blend(g, n.fine, 'overlay', 0.18, 1);
   blend(g, n.streak, 'multiply', 0.3, 2);
-  const [hc, hg] = base('#808080');
+  const [hc, hg] = hbase('#808080');
   blend(hg, n.fine, 'overlay', 0.5, 1);
   blend(hg, n.mid, 'overlay', 0.3, 1);
   return { map: c, normalMap: normalFromHeight(hc, 0.9) };
@@ -199,7 +211,7 @@ export function terrace() {
     });
   }
   blend(g, n.streak, 'multiply', 0.15, 1);
-  const [hc, hg] = base('#808080');
+  const [hc, hg] = hbase('#808080');
   blend(hg, n.fine, 'overlay', 0.6, 1);
   return { map: c, normalMap: normalFromHeight(hc, 1) };
 }
@@ -209,7 +221,7 @@ export function clayTiles() {
   const n = N();
   const rnd = mulberry32(707);
   const [c, g] = base('#8e4a34');
-  const [hc, hg] = base('#404040');
+  const [hc, hg] = hbase('#404040');
   const tw = 32, th = 48;
   for (let row = 0; row < S / th + 1; row++) {
     for (let col = 0; col < S / tw; col++) {
@@ -246,7 +258,7 @@ export function clayTiles() {
 export function tinSheet() {
   const n = N();
   const [c, g] = base('#c9cdd1');
-  const [hc, hg] = base('#808080');
+  const [hc, hg] = hbase('#808080');
   for (let x = 0; x < S; x += 16) {
     const gr = g.createLinearGradient(x, 0, x + 16, 0);
     gr.addColorStop(0, grey(150));
@@ -267,15 +279,7 @@ export function tinSheet() {
   blend(g, n.low, 'overlay', 0.4, 2);
   blend(g, n.streak, 'multiply', 0.4, 1);
   // rust
-  g.save();
-  g.globalCompositeOperation = 'multiply';
-  g.globalAlpha = 0.35;
-  const p = g.createPattern(thresholdMask(n.mid, 165, 30), 'repeat');
-  g.fillStyle = '#9a5a30';
-  g.fillRect(0, 0, S, S);
-  g.globalCompositeOperation = 'destination-over';
-  g.restore();
-  void p;
+  blend(g, n.mid, 'multiply', 0.22, 1);
   return { map: c, normalMap: normalFromHeight(hc, 2.6) };
 }
 
@@ -293,7 +297,7 @@ export function ballast() {
     g.ellipse(x, y, r, r * (0.6 + rnd() * 0.4), rnd() * 3, 0, 6.3);
     g.fill();
   }
-  const [hc, hg] = base('#606060');
+  const [hc, hg] = hbase('#606060');
   blend(hg, n.hi, 'overlay', 0.9, 1);
   blend(hg, n.fine, 'overlay', 0.9, 1);
   // sleepers
@@ -321,7 +325,7 @@ export function stone() {
   const n = N();
   const rnd = mulberry32(909);
   const [c, g] = base('#4a4743');
-  const [hc, hg] = base('#303030');
+  const [hc, hg] = hbase('#303030');
   const rows = 8, rh = S / rows;
   for (let r = 0; r < rows; r++) {
     let x = r % 2 ? -40 : 0;
@@ -351,7 +355,7 @@ export function wood() {
   const n = N();
   const rnd = mulberry32(1010);
   const [c, g] = base('#b9a58c');
-  const [hc, hg] = base('#909090');
+  const [hc, hg] = hbase('#909090');
   for (let x = 0; x < S; x += 64) {
     const v = rnd();
     g.fillStyle = grey(0, v * 0.18);
@@ -383,7 +387,7 @@ export function leaves() {
   blend(g, n.mid, 'multiply', 0.6, 1);
   blend(g, n.hi, 'multiply', 0.35, 1);
   blend(g, n.low, 'overlay', 0.35, 2);
-  const [hc, hg] = base('#808080');
+  const [hc, hg] = hbase('#808080');
   blend(hg, n.hi, 'overlay', 1, 1);
   blend(hg, n.mid, 'overlay', 1, 1);
   return { map: c, normalMap: normalFromHeight(hc, 3) };
@@ -395,14 +399,14 @@ export function bark() {
   blend(g, n.streak, 'multiply', 0.7, 1);
   blend(g, n.mid, 'overlay', 0.4, 1);
   blend(g, n.fine, 'overlay', 0.3, 1);
-  const [hc, hg] = base('#808080');
+  const [hc, hg] = hbase('#808080');
   blend(hg, n.streak, 'overlay', 1, 1);
   return { map: c, normalMap: normalFromHeight(hc, 2) };
 }
 
 /** Tileable ripple normals for lakes and the river. */
 export function waterNormals() {
-  const [hc, hg] = base('#808080');
+  const [hc, hg] = hbase('#808080');
   const n = N();
   blend(hg, n.mid, 'overlay', 1, 1);
   blend(hg, n.hi, 'overlay', 0.6, 1);

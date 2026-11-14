@@ -52,7 +52,7 @@ export function placeNames(m, env) {
   ctx.namedGrid = namedGrid;
 
   // ---- signboards on real establishments ------------------------------------------
-  const boxes = data.buildings.filter((b) => b.pts && b.k !== 'c' && b.k !== 'w').map((b) => ({ b, bb: bbox(b.pts) }));
+  const boxes = data.buildings.filter((b) => b.pts && b.k !== 'c' && b.k !== 'w' && ctx.drawAt(b.pts[0][0], b.pts[0][1])).map((b) => ({ b, bb: bbox(b.pts) }));
   const nearestWall = (x, z, range) => {
     let best = null;
     for (const { b, bb } of boxes) {
