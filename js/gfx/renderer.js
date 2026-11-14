@@ -10,9 +10,9 @@ import { GTAOPass } from '../../vendor/addons/postprocessing/GTAOPass.js';
 import { setMaxAniso } from './texkit.js';
 
 export const TIERS = {
-  low: { pixelRatio: 1, shadow: 1024, shadowRange: 70, ao: false, bloom: false, reflect: false, msaa: 0, far: 900, detail: 0.5 },
-  medium: { pixelRatio: 1.25, shadow: 2048, shadowRange: 100, ao: false, bloom: true, reflect: false, msaa: 4, far: 1500, detail: 0.8 },
-  high: { pixelRatio: 1.5, shadow: 4096, shadowRange: 130, ao: true, bloom: true, reflect: true, msaa: 4, far: 2200, detail: 1 },
+  low: { pixelRatio: 1, shadow: 1024, shadowRange: 70, ao: false, bloom: false, reflect: false, msaa: 0, far: 750, detail: 0.5, detailRange: 220 },
+  medium: { pixelRatio: 1.25, shadow: 2048, shadowRange: 100, ao: false, bloom: true, reflect: false, msaa: 4, far: 1100, detail: 0.8, detailRange: 300 },
+  high: { pixelRatio: 1.5, shadow: 4096, shadowRange: 130, ao: true, bloom: true, reflect: true, msaa: 4, far: 1500, detail: 1, detailRange: 380 },
 };
 
 export function pickTier() {

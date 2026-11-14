@@ -61,6 +61,8 @@ class Buf {
   }
 }
 
+/** Small street-level detail: skipped by the lake mirror and hidden on far-away blocks. */
+export const DETAIL = new Set(['flat', 'gloss', 'glow', 'pool', 'mark', 'bark', 'wood', 'stone', 'shop']);
 const NO_SHADOW = new Set(['asphalt', 'paver', 'earth', 'grass', 'mark', 'pool', 'glow', 'ballast']);
 
 export class Mesher {
@@ -383,6 +385,10 @@ export class Mesher {
         mesh.castShadow = shadows && !NO_SHADOW.has(layer);
         mesh.receiveShadow = layer !== 'glow' && layer !== 'pool';
         if (layer === 'pool') mesh.renderOrder = 3;
+        if (DETAIL.has(layer)) {
+          if (layer !== 'shop' && layer !== 'stone') mesh.layers.set(1);
+          mesh.userData.detail = true;
+        }
         mesh.matrixAutoUpdate = false;
         g.add(mesh);
         tris += b.n / 3;
@@ -390,6 +396,9 @@ export class Mesher {
         meshes++;
       }
       g.matrixAutoUpdate = false;
+      const [ix, iz] = key.split(',').map(Number);
+      g.userData.cx = (ix + 0.5) * this.cs;
+      g.userData.cz = (iz + 0.5) * this.cs;
       root.add(g);
     }
     this.chunks.clear();

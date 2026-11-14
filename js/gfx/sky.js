@@ -79,7 +79,8 @@ export class Atmosphere {
     this.time = 0;
 
     this.sky = new Sky();
-    this.sky.scale.setScalar(1800);
+    const DOME = tier.far * 0.86;
+    this.sky.scale.setScalar(DOME * 1.1);
     this.sky.material.depthTest = false;
     this.sky.renderOrder = -20;
     this.sky.frustumCulled = false;
@@ -87,7 +88,7 @@ export class Atmosphere {
 
     // Night dome: deep blue gradient that fades in after sunset.
     this.nightDome = new THREE.Mesh(
-      new THREE.SphereGeometry(1700, 24, 12),
+      new THREE.SphereGeometry(DOME, 24, 12),
       new THREE.ShaderMaterial({
         side: THREE.BackSide, depthTest: false, depthWrite: false, transparent: false, fog: false,
         blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
@@ -108,9 +109,9 @@ export class Atmosphere {
     const sp = new Float32Array(1400 * 3);
     for (let i = 0; i < 1400; i++) {
       const u = Math.random() * 2 - 1, t = Math.random() * 6.283, r = Math.sqrt(1 - u * u);
-      sp[i * 3] = r * Math.cos(t) * 1600;
-      sp[i * 3 + 1] = Math.abs(u) * 1600;
-      sp[i * 3 + 2] = r * Math.sin(t) * 1600;
+      sp[i * 3] = r * Math.cos(t) * DOME * 0.95;
+      sp[i * 3 + 1] = Math.abs(u) * DOME * 0.95;
+      sp[i * 3 + 2] = r * Math.sin(t) * DOME * 0.95;
     }
     const sg = new THREE.BufferGeometry();
     sg.setAttribute('position', new THREE.BufferAttribute(sp, 3));
@@ -120,7 +121,8 @@ export class Atmosphere {
     scene.add(this.stars);
 
     // Moon
-    this.moon = new THREE.Mesh(new THREE.CircleGeometry(38, 24), new THREE.MeshBasicMaterial({ color: 0xfff6dc, transparent: false, blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor, opacity: 0, depthTest: false, depthWrite: false, fog: false, toneMapped: false }));
+    this.dome = DOME;
+    this.moon = new THREE.Mesh(new THREE.CircleGeometry(DOME * 0.024, 24), new THREE.MeshBasicMaterial({ color: 0xfff6dc, transparent: false, blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor, opacity: 0, depthTest: false, depthWrite: false, fog: false, toneMapped: false }));
     this.moon.renderOrder = -17;
     this.moon.frustumCulled = false;
     scene.add(this.moon);
@@ -133,7 +135,7 @@ export class Atmosphere {
         uSun: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color(1, 1, 1) }, uSkyCol: { value: new THREE.Color(0.5, 0.6, 0.8) },
       },
     });
-    this.clouds = new THREE.Mesh(new THREE.SphereGeometry(1500, 32, 16), this.cloudMat);
+    this.clouds = new THREE.Mesh(new THREE.SphereGeometry(DOME * 0.9, 32, 16), this.cloudMat);
     this.clouds.renderOrder = -16;
     this.clouds.frustumCulled = false;
     scene.add(this.clouds);
@@ -252,14 +254,14 @@ export class Atmosphere {
     fc.lerp(this._c2.setRGB(0.6, 0.63, 0.66), wet * 0.9 * day);
     fc.lerp(this._c2.setRGB(0.045, 0.06, 0.11), night);
     this.scene.fog.color.copy(fc);
-    this.scene.fog.near = lerp(220, 30, wet);
-    this.scene.fog.far = lerp(this.tier.far * 0.95, 460, wet);
+    this.scene.fog.near = lerp(160, 30, wet);
+    this.scene.fog.far = lerp(this.tier.far * 0.9, 440, wet);
 
     // Domes follow the camera
     for (const o of [this.sky, this.nightDome, this.stars, this.clouds]) o.position.copy(camPos);
     this.nightDome.material.uniforms.uA.value = night * 0.97;
     this.stars.material.opacity = night * (1 - wet) * 0.9;
-    this.moon.position.copy(camPos).addScaledVector(this.lightDir, 1500);
+    this.moon.position.copy(camPos).addScaledVector(this.lightDir, this.dome * 0.9);
     this.moon.lookAt(camPos);
     this.moon.material.opacity = night * (1 - wet * 0.8);
 

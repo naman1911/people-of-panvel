@@ -96,6 +96,9 @@ export function createWater(polys, tier, scene) {
     return [x0, z0, x1, z1];
   });
 
+  const frustum = new THREE.Frustum(), pv = new THREE.Matrix4();
+  const box3 = boxes.map((b) => new THREE.Box3(new THREE.Vector3(b[0], -0.5, b[1]), new THREE.Vector3(b[2], 0.5, b[3])));
+
   return {
     group,
     /** Turn the planar reflection off (used when the frame rate drops). */
@@ -105,14 +108,17 @@ export function createWater(polys, tier, scene) {
       mirror = null;
       simple.visible = true;
     },
-    update(dt, cam, atmosphere) {
+    update(dt, cam, atmosphere, camera) {
       normals.offset.x += dt * 0.006;
       normals.offset.y += dt * 0.004;
       if (!mirror) return;
+      // Reflections cost a whole extra render of the town, so only when water is close and on screen.
       let near = false;
-      for (const b of boxes) {
+      if (camera) frustum.setFromProjectionMatrix(pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+      for (let i = 0; i < boxes.length; i++) {
+        const b = boxes[i];
         const dx = Math.max(b[0] - cam.x, 0, cam.x - b[2]), dz = Math.max(b[1] - cam.z, 0, cam.z - b[3]);
-        if (dx * dx + dz * dz < 420 * 420) {
+        if (dx * dx + dz * dz < 380 * 380 && (!camera || frustum.intersectsBox(box3[i]))) {
           near = true;
           break;
         }

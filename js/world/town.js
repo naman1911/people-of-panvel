@@ -95,7 +95,21 @@ export function buildTown(data, lib, tier, hooks = {}) {
         m.chunk(a[0], a[1]);
         m.quadUp([prom.L[i - 1][0], 0.035, prom.L[i - 1][1]], [prom.R[i - 1][0], 0.035, prom.R[i - 1][1]], [prom.R[i][0], 0.035, prom.R[i][1]], [prom.L[i][0], 0.035, prom.L[i][1]], null, null, null, null, m.rgb('#ffffff'), 'paver');
         m.beam(a[0], 0.0, a[1], b[0], 0.0, b[1], 0.5, 0.42, '#b9b2a4', 'stone');
+        // painted railing along the water's edge
+        const el = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        if (el > 0.5 && ctx.detailAt(a[0], a[1])) {
+          m.beam(a[0], 1.12, a[1], b[0], 1.12, b[1], 0.06, 0.06, '#2f6f8f', 'gloss');
+          m.beam(a[0], 0.78, a[1], b[0], 0.78, b[1], 0.04, 0.04, '#2f6f8f', 'gloss');
+          const n = Math.max(1, Math.round(el / 2.4));
+          for (let k = 0; k < n; k++) {
+            const t = k / n;
+            m.box(a[0] + (b[0] - a[0]) * t, 0.42, a[1] + (b[1] - a[1]) * t, 0.08, 0.74, 0.08, '#e9e4d6', 'gloss');
+          }
+        }
       }
+      // the walking track people circle in the evening
+      const track = ribbon(closedPts, 8);
+      (ctx.promenades ||= []).push((polyArea(p) > 0 ? track.L : track.R).slice(0, -1));
     }
   }
   for (const r of data.rivers) {

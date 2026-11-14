@@ -21,9 +21,9 @@ a{color:var(--gold)}
 /* boot + title */
 .boot{position:fixed;left:max(6vw,var(--safe-l));bottom:14vh;transition:opacity .5s;pointer-events:none;z-index:5}
 .boot-kicker,.intro-kicker{font-family:var(--display);font-weight:800;letter-spacing:5px;color:var(--gold);font-size:clamp(15px,2.2vw,22px)}
-.boot h1,.intro h1{font-family:var(--display);font-weight:800;font-size:clamp(72px,16vw,200px);line-height:.84;margin:0 0 0 -.04em;color:var(--paper);text-shadow:0 8px 40px rgba(0,0,0,.5)}
+.boot h1,.intro h1{font-family:var(--display);font-weight:800;font-size:clamp(54px,min(16vw,27vh),200px);line-height:.84;margin:0 0 0 -.04em;color:var(--paper);text-shadow:0 8px 40px rgba(0,0,0,.5)}
 .boot p{font-size:17px;color:var(--muted);margin:10px 0 0}
-.intro{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:calc(20px + var(--safe-t)) max(6vw,var(--safe-r)) calc(8vh + var(--safe-b)) max(6vw,var(--safe-l));background:linear-gradient(180deg,rgba(16,37,43,.25) 0%,rgba(16,37,43,0) 28%,rgba(16,37,43,.82) 84%)}
+.intro{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:space-between;gap:10px;overflow-y:auto;padding:calc(20px + var(--safe-t)) max(6vw,var(--safe-r)) calc(min(8vh,56px) + var(--safe-b)) max(6vw,var(--safe-l));background:linear-gradient(180deg,rgba(16,37,43,.25) 0%,rgba(16,37,43,0) 28%,rgba(16,37,43,.82) 84%)}
 .intro-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .intro-mr{font-family:var(--display);font-weight:700;font-size:clamp(22px,3.4vw,40px);color:var(--board);margin:-.1em 0 .1em}
 .intro-line{font-size:clamp(18px,2.2vw,24px);font-weight:600;margin:10px 0 2px}
@@ -217,4 +217,17 @@ button.item:hover{border-color:rgba(255,182,39,.55);background:rgba(255,182,39,.
   .travel .board{transform:scale(1.3)}
 }
 @media (max-width:760px) and (orientation:landscape){.hud-center{left:auto;right:calc(120px + var(--safe-r));transform:none;top:calc(10px + var(--safe-t));width:auto;max-width:44vw}.panel,.panel--left,.panel--right,.panel--center{top:calc(8px + var(--safe-t))}}
+/* short screens: a phone held sideways */
+@media (max-height:560px){
+  .intro{padding-top:calc(10px + var(--safe-t));padding-bottom:calc(12px + var(--safe-b))}
+  .intro-kicker{font-size:13px;letter-spacing:3px}
+  .intro-mr{font-size:20px}
+  .intro-line{font-size:16px;margin:4px 0 0}
+  .intro-sub,.credit{display:none}
+  .intro-meta{margin:6px 0 10px}
+  .intro .btn{font-size:18px;padding:9px 20px 7px}
+  .minimap{width:104px;height:104px}
+  .panel,.panel--left,.panel--right,.panel--center{top:calc(8px + var(--safe-t));bottom:calc(8px + var(--safe-b));max-height:none}
+  .panel--center{transform:translateX(-50%)}
+}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01s!important;transition:none!important}}

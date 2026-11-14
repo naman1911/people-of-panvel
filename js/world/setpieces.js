@@ -324,6 +324,7 @@ export function placeSetpieces(m, env) {
 
   // ---- station: canopies, nameboards and waiting locals --------------------------
   const rails = data.rails.filter((r) => !r.s && r.pts);
+  const usedRails = new Set();
   platforms.polys.forEach((poly, pi) => {
     const ob = orientedBox(poly);
     if (ob.len < 60) return;
@@ -353,6 +354,25 @@ export function placeSetpieces(m, env) {
       m.box(x - ob.ax * 1.5, H, z - ob.az * 1.5, 0.12, 3.2, 0.12, '#3a3a3a', 'gloss');
       m.box(x + ob.ax * 1.5, H, z + ob.az * 1.5, 0.12, 3.2, 0.12, '#3a3a3a', 'gloss');
     }
+    // a free running line beside the other platforms carries the local that comes and goes
+    if (pi % 2 === 1 && !spots.trainPath) {
+      let bestR = null;
+      for (const r of rails) {
+        if (usedRails.has(r)) continue;
+        for (let i = 1; i < r.pts.length; i++) {
+          const q = segDist(ob.cx, ob.cz, r.pts[i - 1][0], r.pts[i - 1][1], r.pts[i][0], r.pts[i][1]);
+          if (!bestR || q.d < bestR.d) bestR = { d: q.d, r, i, x: q.x, z: q.z };
+        }
+      }
+      if (bestR && bestR.d < 14 && polyLen(bestR.r.pts) > 260) {
+        const r = bestR.r;
+        let s0 = 0;
+        for (let i = 1; i < bestR.i; i++) s0 += Math.hypot(r.pts[i][0] - r.pts[i - 1][0], r.pts[i][1] - r.pts[i - 1][1]);
+        s0 += Math.hypot(bestR.x - r.pts[bestR.i - 1][0], bestR.z - r.pts[bestR.i - 1][1]);
+        spots.trainPath = { pts: r.pts, stop: s0, len: polyLen(r.pts) };
+        usedRails.add(r);
+      }
+    }
     // a local standing at the nearest running line
     if (pi % 2 === 0) {
       let best = null;
@@ -362,8 +382,9 @@ export function placeSetpieces(m, env) {
           if (!best || q.d < best.d) best = { d: q.d, r, i, x: q.x, z: q.z };
         }
       }
-      if (best && best.d < 14) {
+      if (best && best.d < 14 && !usedRails.has(best.r)) {
         const r = best.r;
+        usedRails.add(r);
         let s0 = 0;
         for (let i = 1; i < best.i; i++) s0 += Math.hypot(r.pts[i][0] - r.pts[i - 1][0], r.pts[i][1] - r.pts[i - 1][1]);
         s0 += Math.hypot(best.x - r.pts[best.i - 1][0], best.z - r.pts[best.i - 1][1]);
@@ -380,6 +401,24 @@ export function placeSetpieces(m, env) {
       }
     }
   });
+
+  // ---- cows on the old-town streets -----------------------------------------------
+  {
+    let n = 0;
+    for (const r of data.roads) {
+      if (n >= 9) break;
+      if (!'ER'.includes(r.c) || r.len < 30 || r.h || r.tu) continue;
+      const mid = along(r.pts, r.len * (0.2 + rnd() * 0.6));
+      if (Math.hypot(mid.x + 470, mid.z - 470) > 320 || rnd() < 0.82) continue;
+      const side = rnd() < 0.5 ? 1 : -1, off = r.w / 2 - 0.9;
+      const x = mid.x + mid.dz * off * side, z = mid.z - mid.dx * off * side;
+      if (P.taken(x, z, 3) || P.nearBuilding(x, z, 1)) continue;
+      m.chunk(x, z);
+      m.at(x, 0, z, Math.atan2(-mid.dz, mid.dx) + (rnd() - 0.5), () => M.cow(m, rnd));
+      reserve(x, z, 0.95);
+      n++;
+    }
+  }
 
   // ---- CIDCO water towers --------------------------------------------------------
   for (const poi of data.pois) {

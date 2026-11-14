@@ -28,14 +28,52 @@ function geos() {
   return G;
 }
 
-const mats = new Map();
-function mat(color, rough = 0.85) {
-  const key = color + '|' + rough;
-  let m = mats.get(key);
-  if (!m) mats.set(key, (m = new THREE.MeshStandardMaterial({ color, roughness: rough })));
-  return m;
+// One shared material: every person is a handful of vertex-coloured meshes.
+let bodyMat = null, blobMat = null;
+const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _c = new THREE.Color();
+const flatCache = new Map();
+function flat(geo) {
+  let g = flatCache.get(geo);
+  if (!g) flatCache.set(geo, (g = geo.index ? geo.toNonIndexed() : geo));
+  return g;
 }
-let blobMat = null;
+
+/** Collects coloured pieces and bakes them into a single mesh. */
+class Baker {
+  constructor() {
+    this.pos = [];
+    this.nor = [];
+    this.col = [];
+  }
+  add(geo, color, x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1, rx = 0, ry = 0, rz = 0) {
+    const g = flat(geo);
+    _m4.compose(_p.set(x, y, z), _q.setFromEuler(_e.set(rx, ry, rz)), _s.set(sx, sy, sz));
+    const nm = new THREE.Matrix3().getNormalMatrix(_m4);
+    const P = g.attributes.position, N = g.attributes.normal;
+    _c.set(color);
+    for (let i = 0; i < P.count; i++) {
+      _p.fromBufferAttribute(P, i).applyMatrix4(_m4);
+      this.pos.push(_p.x, _p.y, _p.z);
+      _p.fromBufferAttribute(N, i).applyMatrix3(nm).normalize();
+      this.nor.push(_p.x, _p.y, _p.z);
+      this.col.push(_c.r, _c.g, _c.b);
+    }
+    return this;
+  }
+  mesh(parent) {
+    if (!this.pos.length) return null;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nor, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
+    if (!bodyMat) bodyMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.84 });
+    const mesh = new THREE.Mesh(g, bodyMat);
+    mesh.castShadow = true;
+    mesh.layers.set(1);
+    parent.add(mesh);
+    return mesh;
+  }
+}
 
 export const SKIN = ['#8d5a3b', '#a4683f', '#b97c52', '#c68e63', '#7a4a2f', '#d2a078'];
 const HAIR = ['#1a1412', '#221a16', '#2b1f18', '#3a2a20'];
@@ -67,117 +105,105 @@ export class Person {
     this.body = new THREE.Group();
     this.root.add(this.body);
     this.body.scale.setScalar(L.h);
-    const skin = mat(L.skin), top = mat(L.top), bottom = mat(L.bottom), hair = mat(L.hair, 0.6);
-    const add = (geo, m, x = 0, y = 0, z = 0, parent = this.body) => {
-      const mesh = new THREE.Mesh(geo, m);
-      mesh.position.set(x, y, z);
-      mesh.castShadow = true;
-      parent.add(mesh);
-      return mesh;
-    };
+    const skin = L.skin, top = L.top, bottom = L.bottom, hair = L.hair, accent = L.accent;
     const saree = L.garb === 'saree', salwar = L.garb === 'salwar', kurta = L.garb === 'kurta';
 
-    // torso and head
+    // ---- torso, head, hair and everything worn on them: one mesh -------------------
     this.torso = new THREE.Group();
     this.torso.position.y = 0.86;
     this.body.add(this.torso);
-    add(g.torso, saree ? mat(L.accent) : top, 0, 0.3, 0, this.torso);
-    add(g.neck, skin, 0, 0.6, 0, this.torso);
-    this.head = new THREE.Group();
-    this.head.position.y = 0.76;
-    this.torso.add(this.head);
-    add(g.head, skin, 0, 0, 0, this.head);
-    add(g.eye, mat('#161616', 0.4), -0.045, 0.012, 0.115, this.head);
-    add(g.eye, mat('#161616', 0.4), 0.045, 0.012, 0.115, this.head);
-
-    // hair and headwear
+    const T = new Baker();
+    T.add(g.torso, saree ? accent : top, 0, 0.3, 0);
+    T.add(g.neck, skin, 0, 0.6, 0);
+    const HY = 0.76; // head centre above the hips
+    T.add(g.head, skin, 0, HY, 0);
+    T.add(g.eye, '#161616', -0.045, HY + 0.012, 0.115);
+    T.add(g.eye, '#161616', 0.045, HY + 0.012, 0.115);
     const hs = L.hairStyle;
     if (hs !== 'bald' && hs !== 'scarf') {
-      const cap = add(g.hair, hair, 0, 0.012, -0.012, this.head);
-      cap.rotation.x = -0.22;
-      if (hs === 'long' || hs === 'plait') add(g.hairLong, hair, 0, -0.14, -0.1, this.head);
-      if (hs === 'plait') add(g.box, hair, 0, -0.42, -0.14, this.head).scale.set(0.05, 0.36, 0.05);
-      if (hs === 'bun') add(g.bun, hair, 0, 0.0, -0.14, this.head);
+      T.add(g.hair, hair, 0, HY + 0.012, -0.012, 1, 1, 1, -0.22);
+      if (hs === 'long' || hs === 'plait') T.add(g.hairLong, hair, 0, HY - 0.14, -0.1);
+      if (hs === 'plait') T.add(g.box, hair, 0, HY - 0.42, -0.14, 0.05, 0.36, 0.05);
+      if (hs === 'bun') T.add(g.bun, hair, 0, HY, -0.14);
     }
     if (hs === 'scarf') {
-      const sc = add(g.hair, mat(L.accent), 0, 0.0, -0.02, this.head);
-      sc.scale.set(1.1, 1.2, 1.15);
-      sc.rotation.x = -0.1;
-      add(g.hairLong, mat(L.accent), 0, -0.13, -0.07, this.head).scale.set(1.25, 1.1, 1.3);
+      T.add(g.hair, accent, 0, HY, -0.02, 1.1, 1.2, 1.15, -0.1);
+      T.add(g.hairLong, accent, 0, HY - 0.13, -0.07, 1.25, 1.1, 1.3);
     }
     for (const a of L.acc) {
-      if (a === 'topi') add(g.box, mat('#f5f5f0'), 0, 0.125, 0, this.head).scale.set(0.2, 0.07, 0.25);
+      if (a === 'topi') T.add(g.box, '#f5f5f0', 0, HY + 0.125, 0, 0.2, 0.07, 0.25);
       if (a === 'cap') {
-        add(g.cap, mat(L.accent), 0, 0.045, 0, this.head);
-        add(g.box, mat(L.accent), 0, 0.07, 0.15, this.head).scale.set(0.16, 0.02, 0.12);
+        T.add(g.cap, accent, 0, HY + 0.045, 0);
+        T.add(g.box, accent, 0, HY + 0.07, 0.15, 0.16, 0.02, 0.12);
       }
-      if (a === 'specs') add(g.box, mat('#1b1b1b', 0.3), 0, 0.014, 0.125, this.head).scale.set(0.2, 0.035, 0.012);
-      if (a === 'moustache') add(g.box, mat('#1a1412'), 0, -0.045, 0.122, this.head).scale.set(0.08, 0.018, 0.012);
-      if (a === 'beard') add(g.box, mat(L.hair), 0, -0.085, 0.09, this.head).scale.set(0.15, 0.09, 0.08);
+      if (a === 'specs') T.add(g.box, '#1b1b1b', 0, HY + 0.014, 0.125, 0.2, 0.035, 0.012);
+      if (a === 'moustache') T.add(g.box, '#1a1412', 0, HY - 0.045, 0.122, 0.08, 0.018, 0.012);
+      if (a === 'beard') T.add(g.box, hair, 0, HY - 0.085, 0.09, 0.15, 0.09, 0.08);
       if (a === 'basket') {
-        add(g.disc, mat('#b98a4a'), 0, 0.2, 0, this.head);
-        add(g.box, mat('#c9d3da', 0.4), 0, 0.27, 0, this.head).scale.set(0.42, 0.05, 0.32);
+        T.add(g.disc, '#b98a4a', 0, HY + 0.2, 0);
+        T.add(g.box, '#c9d3da', 0, HY + 0.27, 0, 0.42, 0.05, 0.32);
       }
-      if (a === 'bag') add(g.box, mat(L.accent), 0, 0.26, -0.17, this.torso).scale.set(0.3, 0.38, 0.14);
+      if (a === 'bag') T.add(g.box, accent, 0, 0.26, -0.17, 0.3, 0.38, 0.14);
       if (a === 'sling') {
-        const st = add(g.box, mat('#3e2f25'), 0, 0.3, 0.02, this.torso);
-        st.scale.set(0.035, 0.66, 0.24);
-        st.rotation.z = 0.62;
-        add(g.box, mat('#3e2f25'), 0.2, -0.02, 0.06, this.torso).scale.set(0.1, 0.2, 0.24);
+        T.add(g.box, '#3e2f25', 0, 0.3, 0.02, 0.035, 0.66, 0.24, 0, 0, 0.62);
+        T.add(g.box, '#3e2f25', 0.2, -0.02, 0.06, 0.1, 0.2, 0.24);
       }
-      if (a === 'binoculars') add(g.box, mat('#222'), 0, 0.36, 0.14, this.torso).scale.set(0.14, 0.08, 0.08);
-      if (a === 'apron') add(g.box, mat('#f2ece0'), 0, 0.16, 0.115, this.torso).scale.set(0.3, 0.5, 0.02);
+      if (a === 'binoculars') T.add(g.box, '#222222', 0, 0.36, 0.14, 0.14, 0.08, 0.08);
+      if (a === 'apron') T.add(g.box, '#f2ece0', 0, 0.16, 0.115, 0.3, 0.5, 0.02);
     }
+    if (saree) {
+      // pallu over the left shoulder
+      T.add(g.box, top, 0.02, 0.3, 0.02, 0.09, 0.72, 0.27, 0, 0, -0.66);
+      T.add(g.box, top, -0.19, 0.2, -0.12, 0.1, 0.7, 0.04);
+    }
+    if (salwar) {
+      T.add(g.box, accent, 0, 0.5, 0.1, 0.36, 0.05, 0.05);
+      T.add(g.box, accent, -0.16, 0.22, -0.1, 0.07, 0.62, 0.03);
+      T.add(g.box, accent, 0.16, 0.22, -0.1, 0.07, 0.62, 0.03);
+    }
+    T.mesh(this.torso);
 
-    // arms
-    const armMat = saree || salwar || L.garb === 'tee' ? skin : top;
+    // ---- arms: one mesh each ---------------------------------------------------------
+    const bare = saree || salwar || L.garb === 'tee';
     this.arms = [-1, 1].map((s) => {
       const p = new THREE.Group();
       p.position.set(s * 0.215, 0.52, 0);
       this.torso.add(p);
-      add(g.arm, armMat === skin ? skin : top, 0, 0, 0, p);
-      if (armMat === skin) add(g.sleeve, saree ? mat(L.accent) : top, 0, 0, 0, p);
-      add(g.hand, skin, 0, 0, 0, p);
+      const A = new Baker();
+      A.add(g.arm, bare ? skin : top);
+      if (bare) A.add(g.sleeve, saree ? accent : top);
+      A.add(g.hand, skin);
+      A.mesh(p);
       return p;
     });
 
-    // legs
+    // ---- legs: one mesh each -----------------------------------------------------------
     this.legs = [-1, 1].map((s) => {
       const p = new THREE.Group();
       p.position.set(s * 0.085, 0.88, 0);
       this.body.add(p);
-      add(g.leg, L.garb === 'shorts' ? skin : bottom, 0, 0, 0, p);
-      add(g.shoe, mat(saree || salwar ? '#8a5a3a' : '#2a2422'), 0, 0, 0, p);
+      const B = new Baker();
+      B.add(g.leg, L.garb === 'shorts' ? skin : bottom);
+      B.add(g.shoe, saree || salwar ? '#8a5a3a' : '#2a2422');
+      B.mesh(p);
       return p;
     });
-    if (saree) {
-      this.skirt = add(g.skirt, top, 0, 0.44, 0);
-      // pallu over the left shoulder
-      const pl = add(g.box, top, 0.02, 0.3, 0.02, this.torso);
-      pl.scale.set(0.09, 0.72, 0.27);
-      pl.rotation.z = -0.66;
-      add(g.box, top, -0.19, 0.2, -0.12, this.torso).scale.set(0.1, 0.7, 0.04);
-    } else if (salwar || kurta) {
-      add(g.kurta, top, 0, 0.66, 0);
-      if (salwar) {
-        const du = add(g.box, mat(L.accent), 0, 0.5, 0.1, this.torso);
-        du.scale.set(0.36, 0.05, 0.05);
-        add(g.box, mat(L.accent), -0.16, 0.22, -0.1, this.torso).scale.set(0.07, 0.62, 0.03);
-        add(g.box, mat(L.accent), 0.16, 0.22, -0.1, this.torso).scale.set(0.07, 0.62, 0.03);
-      }
-    }
+    if (saree) this.skirt = new Baker().add(g.skirt, top, 0, 0.44, 0).mesh(this.body);
+    else if (salwar || kurta) new Baker().add(g.kurta, top, 0, 0.66, 0).mesh(this.body);
 
     // soft contact shadow, for when real shadows are off or far away
     if (!blobMat) blobMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8 });
     this.blob = new THREE.Mesh(g.shadow, blobMat);
     this.blob.position.y = 0.05;
     this.blob.renderOrder = 2;
+    this.blob.layers.set(1);
     this.root.add(this.blob);
 
     this.phase = Math.random() * 6.28;
     this.pose = 'stand';
     this.waveT = 0;
     this.height = 1.72 * L.h;
+    this.shadows = true;
   }
 
   wave(seconds = 1.6) {
@@ -232,6 +258,8 @@ export class Person {
   }
 
   setShadows(on) {
+    if (on === this.shadows) return;
+    this.shadows = on;
     this.root.traverse((o) => {
       if (o.isMesh && o !== this.blob) o.castShadow = on;
     });
@@ -239,5 +267,8 @@ export class Person {
 
   dispose() {
     this.root.removeFromParent();
+    this.root.traverse((o) => {
+      if (o.isMesh && o !== this.blob) o.geometry.dispose();
+    });
   }
 }

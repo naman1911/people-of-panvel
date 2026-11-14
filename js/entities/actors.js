@@ -292,6 +292,7 @@ export class Residents {
       root.position.set(n.x, this.world.heightAt(n.x, n.z) + (sitting ? -0.06 : 0), n.z);
       root.rotation.y = n.yaw;
       n.person.update(dt, n.speed, sitting ? 'sit' : 'stand');
+      n.person.setShadows(d < 45);
       // idle chatter
       n.nextSay -= dt;
       if (n.nextSay <= 0 && d < 28) {
@@ -378,6 +379,7 @@ export class Crowd {
       root.position.set(x, 'PSE'.includes(w.r.c) ? 0.15 : 0, z);
       root.rotation.y += angDiff(root.rotation.y, yaw) * (1 - Math.exp(-dt * 6));
       w.person.update(dt, w.v, 'stand');
+      w.person.setShadows(d < 45);
     }
   }
 }
@@ -388,6 +390,7 @@ export function buildModel(lib, fn) {
   const m = new Mesher(lib, 1e6);
   fn(m);
   const g = m.build(true);
+  g.traverse((o) => o.layers.set(1));
   return g;
 }
 
@@ -550,6 +553,125 @@ export class Strays {
       g.rotation.y = a.yaw;
       // curled up asleep when left alone
       g.scale.y = !moving && !a.follow ? 0.62 : 1;
+    }
+  }
+}
+
+// ---- evening walkers circling the lakes -------------------------------------------
+
+export class Walkers {
+  constructor(scene, loops, count) {
+    this.rnd = mulberry32(2024);
+    this.list = [];
+    const usable = loops.map((pts) => {
+      let len = 0;
+      const closed = pts.concat([pts[0]]);
+      for (let i = 1; i < closed.length; i++) len += Math.hypot(closed[i][0] - closed[i - 1][0], closed[i][1] - closed[i - 1][1]);
+      return { pts: closed, len };
+    }).filter((l) => l.len > 150);
+    if (!usable.length) return;
+    const total = usable.reduce((s, l) => s + l.len, 0);
+    for (let i = 0; i < count; i++) {
+      // longer tracks get more walkers
+      let pick = this.rnd() * total, loop = usable[0];
+      for (const l of usable) {
+        if ((pick -= l.len) <= 0) {
+          loop = l;
+          break;
+        }
+      }
+      const jog = this.rnd() < 0.25;
+      const person = new Person(completeLook(jog ? { garb: 'tee' } : {}, this.rnd), this.rnd);
+      scene.add(person.root);
+      this.list.push({ person, loop, s: this.rnd() * loop.len, dir: this.rnd() < 0.7 ? 1 : -1, v: jog ? 3.4 + this.rnd() : 1.2 + this.rnd() * 0.5, off: (this.rnd() - 0.5) * 3 });
+    }
+  }
+  update(dt, player) {
+    for (const w of this.list) {
+      w.s = (w.s + w.dir * w.v * dt + w.loop.len) % w.loop.len;
+      const a = along(w.loop.pts, w.s);
+      const x = a.x + a.dz * w.off, z = a.z - a.dx * w.off;
+      const d = Math.hypot(x - player.pos.x, z - player.pos.z);
+      const root = w.person.root;
+      root.visible = d < 150;
+      if (!root.visible) continue;
+      root.position.set(x, 0, z);
+      root.rotation.y = Math.atan2(a.dx * w.dir, a.dz * w.dir);
+      w.person.update(dt, w.v, 'stand');
+      w.person.setShadows(d < 45);
+    }
+  }
+}
+
+// ---- the local that pulls in and out of Panvel ---------------------------------------
+
+export class LocalTrain {
+  constructor(scene, lib, path) {
+    this.path = path;
+    this.cars = [];
+    const n = 6;
+    for (let i = 0; i < n; i++) {
+      const g = buildModel(lib, (m) => M.coach(m, i === 0 ? 1 : i === n - 1 ? -1 : 0));
+      g.visible = false;
+      scene.add(g);
+      this.cars.push(g);
+    }
+    this.L = 21.7;
+    this.half = (n * this.L) / 2;
+    this.state = 'away';
+    this.t = 6;
+    this.dir = 1;
+    this.s = 0;
+    this.v = 0;
+    this.x = 0;
+    this.z = 0;
+  }
+  update(dt, onEvent) {
+    const p = this.path, lo = this.half + 2, hi = p.len - this.half - 2;
+    const stop = Math.min(hi, Math.max(lo, p.stop));
+    if (this.state === 'away') {
+      this.t -= dt;
+      if (this.t > 0) return;
+      this.dir = -this.dir;
+      this.s = this.dir > 0 ? lo : hi;
+      this.v = 15;
+      this.state = 'in';
+      for (const c of this.cars) c.visible = true;
+      onEvent?.('arriving');
+    } else if (this.state === 'in') {
+      const dist = Math.abs(stop - this.s);
+      this.v = Math.min(16, Math.max(0.6, Math.sqrt(2 * 0.9 * dist)));
+      this.s += this.dir * this.v * dt;
+      if (dist < 0.6 || (this.dir > 0 ? this.s >= stop : this.s <= stop)) {
+        this.s = stop;
+        this.v = 0;
+        this.state = 'dwell';
+        this.t = 22;
+        onEvent?.('stopped');
+      }
+    } else if (this.state === 'dwell') {
+      this.t -= dt;
+      if (this.t <= 0) {
+        this.state = 'out';
+        onEvent?.('leaving');
+      }
+    } else {
+      this.v = Math.min(17, this.v + 0.8 * dt);
+      this.s += this.dir * this.v * dt;
+      if (this.s <= lo || this.s >= hi) {
+        this.state = 'away';
+        this.t = 35 + Math.random() * 30;
+        for (const c of this.cars) c.visible = false;
+        return;
+      }
+    }
+    const n = this.cars.length;
+    for (let i = 0; i < n; i++) {
+      const a = along(p.pts, this.s + (((n - 1) / 2 - i) * this.L));
+      const c = this.cars[i];
+      c.position.set(a.x, 0.18, a.z);
+      c.rotation.y = Math.atan2(-a.dz, a.dx);
+      if (i === (n >> 1)) (this.x = a.x), (this.z = a.z);
     }
   }
 }

@@ -17,7 +17,7 @@ import { signGroup, setSignNight } from './world/signs.js';
 import { World } from './world/world.js';
 import * as M from './world/models.js';
 import { Input } from './input.js';
-import { Player, CameraRig, Residents, Crowd, Traffic, Rickshaws, Strays, buildModel } from './entities/actors.js';
+import { Player, CameraRig, Residents, Crowd, Traffic, Rickshaws, Strays, Walkers, LocalTrain, buildModel } from './entities/actors.js';
 import { PEOPLE, POSTERS } from './data/people.js';
 import { HUBS, STAMPS, SPAWN, TITLE_SHOT, zoneAt } from './data/places.js';
 import { createUI } from './ui.js';
@@ -37,6 +37,7 @@ async function start() {
   const R = createRenderer(canvas, tierName);
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(56, window.innerWidth / window.innerHeight, 0.3, R.tier.far);
+  camera.layers.enable(1); // layer 1: small detail the lake mirror skips
 
   say(t('loading'));
   await Promise.all([
@@ -59,6 +60,8 @@ async function start() {
     },
   });
   scene.add(town.group, signGroup);
+  signGroup.traverse((o) => o.layers.set(1));
+  const chunks = town.group.children.filter((c) => c.userData.cx !== undefined).map((c) => ({ c, detail: c.children.filter((mesh) => mesh.userData.detail), shown: true }));
   console.info(`town built in ${Math.round(performance.now() - t0)} ms`, JSON.stringify(town.stats));
 
   const atmo = new Atmosphere(scene, R.renderer, lib, R.tier);
@@ -84,6 +87,9 @@ async function start() {
   const traffic = new Traffic(scene, world, lib, light ? 9 : 22);
   const rickshaws = new Rickshaws(scene, world, lib, spots.autos);
   const strays = new Strays(scene, world, lib, spots.hubs.map((s, i) => ({ x: s.x + 5 + i, z: s.z - 6 })));
+
+  const walkers = new Walkers(scene, town.ctx.promenades || [], light ? 6 : 16);
+  const train = spots.trainPath ? new LocalTrain(scene, lib, spots.trainPath) : null;
 
   // somewhere to sit for residents who sit
   for (const n of residents.list) {
@@ -345,7 +351,7 @@ async function start() {
   const clock = new THREE.Clock();
   const focus = new THREE.Vector3();
   const maxFrames = parseInt(params.get('frames') || '0', 10);
-  let frames = 0, slow = 0, acc = 0, step = 0, degrade = 0, lampT = 0, readT = 0, miniT = 0, lastStep = 0;
+  let frames = 0, slow = 0, acc = 0, step = 0, degrade = 0, lampT = 0, readT = 0, miniT = 0, lastStep = 0, cullT = 0;
 
   function frame() {
     const dt = Math.min(0.05, clock.getDelta());
@@ -366,6 +372,14 @@ async function start() {
       crowd.update(dt, player);
       traffic.update(dt, player);
       strays.update(dt, player);
+      walkers.update(dt, player);
+      train?.update(dt, (ev) => {
+        // you hear it if you are near the station
+        if (Math.hypot(train.path.pts[0][0] - player.pos.x, train.path.pts[0][1] - player.pos.z) < 900 && zoneAt(player.pos.x, player.pos.z).id === 'junction') {
+          if (ev === 'arriving') sfx.chime();
+          if (ev === 'leaving') sfx.horn();
+        }
+      });
       focus.set(player.pos.x, 0, player.pos.z);
 
       action = ui.panel && ui.panelName !== 'profile' && ui.panelName !== 'katta' ? null : findAction();
@@ -455,7 +469,20 @@ async function start() {
     }
 
     atmo.update(dt, camera.position, focus);
-    water.update(dt, camera.position, atmo);
+    water.update(dt, camera.position, atmo, camera);
+    // far-away blocks drop their small street-level detail
+    cullT -= dt;
+    if (cullT <= 0) {
+      cullT = 0.3;
+      const range = R.tier.detailRange + Math.max(0, camera.position.y - 20) * 3;
+      for (const ch of chunks) {
+        const show = Math.hypot(ch.c.userData.cx - camera.position.x, ch.c.userData.cz - camera.position.z) < range + 170;
+        if (show !== ch.shown) {
+          ch.shown = show;
+          for (const mesh of ch.detail) mesh.visible = show;
+        }
+      }
+    }
     setSignNight(atmo.night);
     R.setNight(atmo.night);
     if (state === 'play') ui.updatePlates(camera, action?.id);
@@ -484,7 +511,7 @@ async function start() {
     requestAnimationFrame(frame);
   }
   frame();
-  window.__pop = { scene, camera, R, atmo, town, lib, world, player, rig, residents, game, ui, rickshaws, spots };
+  window.__pop = { scene, camera, R, atmo, town, lib, world, player, rig, residents, game, ui, rickshaws, spots, train, walkers };
   void mulberry32;
 }
 

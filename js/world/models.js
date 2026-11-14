@@ -257,3 +257,24 @@ export function handcart(m, rnd) {
     m.cone(0.7, 2.3, 0.4, 1.25, 0.42, ['#d43a2f', '#2f7fc1', '#f2b632', '#3aa76d'][(rnd() * 4) | 0], 'flat', { seg: 8 });
   }
 }
+
+/** A cow at rest on the roadside, entirely unbothered by traffic. Faces +X. */
+export function cow(m, rnd) {
+  const coat = ['#e9e2d2', '#c9a878', '#5a4232', '#f2efe6', '#8a6a4a'][(rnd() * 5) | 0];
+  const sitting = rnd() < 0.5;
+  const y = sitting ? 0.18 : 0.62;
+  m.box(0, y, 0, 1.55, 0.62, 0.6, coat, 'flat');
+  m.box(0.18, y + 0.62, 0, 0.34, 0.16, 0.34, coat, 'flat'); // hump
+  m.box(0.92, y + 0.34, 0, 0.5, 0.34, 0.3, coat, 'flat', { rz: -0.5 }); // neck and head
+  m.box(1.22, y + 0.34, 0, 0.36, 0.26, 0.28, coat, 'flat');
+  for (const s of [-1, 1]) {
+    m.box(1.12, y + 0.6, s * 0.13, 0.05, 0.2, 0.05, '#d9d2c2', 'flat', { rz: s * 0.2 });
+    m.box(1.02, y + 0.5, s * 0.2, 0.06, 0.05, 0.14, coat, 'flat');
+  }
+  m.box(-0.82, y + 0.1, 0, 0.05, 0.6, 0.05, coat, 'flat', { rz: -0.25 }); // tail
+  if (sitting) {
+    for (const s of [-1, 1]) m.box(0.5, 0, s * 0.36, 0.5, 0.14, 0.14, coat, 'flat');
+  } else {
+    for (const x of [-0.6, 0.55]) for (const s of [-1, 1]) m.box(x, 0, s * 0.2, 0.13, 0.64, 0.13, coat, 'flat');
+  }
+}
