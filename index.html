@@ -25,7 +25,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Mukta:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css" />
+  <!-- Bump the ?v= numbers here and on main.js whenever the site changes, so phones never mix old and new files. -->
+  <link rel="stylesheet" href="css/style.css?v=3" />
   <!-- The import map must come before anything that loads a module. -->
   <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
   <!-- preload:start -->
@@ -44,7 +45,7 @@
   <link rel="modulepreload" href="js/gfx/texkit.js" />
   <link rel="modulepreload" href="js/i18n.js" />
   <link rel="modulepreload" href="js/input.js" />
-  <link rel="modulepreload" href="js/main.js" />
+  <link rel="modulepreload" href="js/main.js?v=3" />
   <link rel="modulepreload" href="js/minimap.js" />
   <link rel="modulepreload" href="js/net/live.js" />
   <link rel="modulepreload" href="js/net/mqtt.js" />
@@ -94,6 +95,6 @@
     <div class="boot-track"><i id="boot-bar"></i></div>
   </div>
   <noscript><p style="padding:24px;color:#fff">People of Panvel needs JavaScript and WebGL to run.</p></noscript>
-  <script type="module" src="js/main.js"></script>
+  <script type="module" src="js/main.js?v=3"></script>
 </body>
 </html>
