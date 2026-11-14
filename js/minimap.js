@@ -144,6 +144,10 @@ export function createMap(data) {
       const [x, y] = tx(hb.x, hb.z);
       dot(ctx, x, y, big ? 5 : 3.5, '#1b1b1b', '#f2c21a');
     }
+    for (const v of game.live.peers.values()) {
+      const [x, y] = tx(v.x, v.z);
+      dot(ctx, x, y, big ? 4.5 : 3.4, '#3ddc84', '#0b5a2e');
+    }
     const met = store.get('met');
     for (const n of game.residents.list) {
       const [x, y] = tx(n.x, n.z);

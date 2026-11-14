@@ -37,6 +37,55 @@ export function createUI(game) {
     setTimeout(() => el.remove(), 4300);
   };
 
+  // ---- unread chat counters, private-chat requests -------------------------------
+  const unread = new Map();
+  const unreadTotal = () => [...unread.values()].reduce((a, b) => a + b, 0);
+  const asks = h('div.asks');
+  root.append(asks);
+  let hudTimer = 0;
+  /** Redraw the HUD soon; many live events can arrive in one burst. */
+  ui.liveChanged = () => {
+    if (hudTimer) return;
+    hudTimer = setTimeout(() => {
+      hudTimer = 0;
+      ui.redrawHud();
+      ui._chat?.tabs();
+    }, 250);
+  };
+  ui.onChat = (channel, msg) => {
+    if (ui.panelName === 'chat' && ui._chat?.cur === channel) return ui._chat.list();
+    if (msg.mine) return;
+    unread.set(channel, (unread.get(channel) || 0) + 1);
+    ui.liveChanged();
+    if (channel.startsWith('dm:')) ui.toast('🔒 ' + msg.name + ': ' + msg.text);
+  };
+  ui.request = (peer) => {
+    const done = (yes) => {
+      clearTimeout(timer);
+      card.remove();
+      game.live.answer(peer.id, yes);
+    };
+    const card = h('div.ask', h('span', '🔒 ', t('wants_chat', { name: peer.name })),
+      h('button.btn.btn--sm', { type: 'button', onclick: () => done(true) }, t('accept')),
+      h('button.btn.btn--ghost.btn--sm', { type: 'button', onclick: () => done(false) }, t('not_now')));
+    const timer = setTimeout(() => done(false), 40000);
+    asks.append(card);
+    sfx.hello();
+  };
+  ui.onLink = (id, st, name) => {
+    if (st === 'open') {
+      ui.toast(t('dm_open', { name }), 'good');
+      ui.open('chat', 'dm:' + id);
+    } else if (st === 'declined') ui.toast(t('dm_declined', { name }));
+    else if (st === 'closed' || st === 'gone') {
+      unread.delete('dm:' + id);
+      if (ui._chat?.cur === 'dm:' + id) ui._chat.pick('near');
+      else ui._chat?.tabs();
+      if (st === 'closed') ui.toast(t('dm_closed', { name }));
+    }
+    ui.liveChanged();
+  };
+
   // ---- title screen -----------------------------------------------------------
   let introEl = null;
   ui.intro = (onEnter) => {
@@ -110,17 +159,33 @@ export function createUI(game) {
     // centre: guest bar + welcome note
     center.replaceChildren();
     const me = store.get('me');
+    const live = game.live;
     if (!me) {
       center.append(h('div.guestbar',
         h('div', h('b', t('guest_title')), h('span', t('guest_sub'))),
         h('button.btn.btn--gold.btn--sm', { type: 'button', onclick: () => ui.open('me') }, t('make_me'), touch ? null : h('kbd', 'M'))));
+    } else if (live.state === 'off') {
+      center.append(h('div.guestbar',
+        h('div', h('b', '👻 ', t('ghost_title')), h('span', t('ghost_sub'))),
+        h('button.btn.btn--gold.btn--sm', { type: 'button', onclick: () => game.goLive() }, t('go_live'), touch ? null : h('kbd', 'L'))));
+    } else if (live.state !== 'on') {
+      center.append(h('div.guestbar', h('div', h('b', t(live.state === 'retry' ? 'reconnecting' : 'connecting')))));
+    } else {
+      const c = live.counts();
+      center.append(h('div.guestbar.livebar',
+        h('div', h('b', h('i.dot'), t('live_title')), h('span', c.all ? t('live_counts', c) : t('live_alone'))),
+        h('button.btn.btn--gold.btn--sm', { type: 'button', onclick: () => ui.open('chat') }, t('chat'), unreadTotal() ? h('span.badge', unreadTotal()) : null, touch ? null : h('kbd', '↵')),
+        h('button.btn.btn--ghost.btn--sm', { type: 'button', title: t('leave_live'), onclick: () => game.leaveLive() }, '✕')));
     }
     if (noteEl) center.append(noteEl);
     // right column
     clockEl = h('button.pill', { type: 'button', onclick: () => game.cycleTime() });
     wxEl = h('button.pill', { type: 'button', onclick: () => game.toggleRain() });
     countEl = h('span.pill');
+    const liveChip = game.live.online ? h('button.chip', { type: 'button', title: t('chat'), onclick: () => ui.open('chat') }, h('span.em', '💬'), h('span.lbl', t('chat')), unreadTotal() ? h('span.badge', unreadTotal()) : null, touch ? null : h('kbd', '↵'))
+      : chip(game.live.state === 'off' ? '👻' : '⏳', t('go_live'), 'L', () => game.goLive());
     right.replaceChildren(
+      liveChip,
       chip('🔍', t('find'), 'F', () => ui.open('find')),
       chip('🛺', t('travel'), 'T', () => ui.open('travel')),
       h('div', { style: { display: 'flex', gap: '6px' } }, clockEl, wxEl),
@@ -163,7 +228,7 @@ export function createUI(game) {
     const night = a.night > 0.5;
     clockEl.textContent = `${night ? '🌙' : '☀️'} ${fmtClock(a.hour)}${a.locked == null ? ' · ' + t('realtime') : ''}`;
     wxEl.textContent = a.raining ? '☔ ' + t('monsoon') : '🌤 ' + t('clear');
-    countEl.replaceChildren(h('i.dot'), ' ', t('people_count', { n: PEOPLE.length, m: store.get('met').length }));
+    countEl.replaceChildren(h('i.dot', game.live.online ? null : { style: { background: '#888', boxShadow: 'none' } }), ' ', game.live.online ? `${game.live.peers.size + 1} ${t('live').toLowerCase()} · ` : '', t('people_count', { n: PEOPLE.length, m: store.get('met').length }));
   };
 
   // prompt
@@ -242,6 +307,22 @@ export function createUI(game) {
       p.el.classList.toggle('plate--focus', n.def.id === focusId);
       project(p, n.x, n.person.root.position.y + n.person.height * (n.def.mode === 'sit' ? 0.82 : 1) + 0.18, n.z, camera, 75);
     }
+    const seen = new Set();
+    for (const v of game.live.peers.values()) {
+      if (!v.person) continue;
+      const key = 'live:' + v.id;
+      seen.add(key);
+      const vp = plateFor(key, '.plate--live');
+      setPlate(vp, v.name.toUpperCase(), '', v.status, v.say);
+      vp.el.classList.toggle('plate--focus', v.id === focusId);
+      project(vp, v.x, v.person.root.position.y + v.person.height * (v.mode ? 0.82 : 1) + 0.18, v.z, camera, 75);
+    }
+    for (const [key, pl] of plates) {
+      if (key.startsWith('live:') && !seen.has(key)) {
+        pl.el.remove();
+        plates.delete(key);
+      }
+    }
     const me = store.get('me');
     const mp = plateFor('@me', '.plate--me');
     if (me && game.player.mode !== 'drive') {
@@ -264,6 +345,7 @@ export function createUI(game) {
     ui.panel = null;
     hud.classList.remove('has-panel');
     const was = ui.panelName;
+    if (was === 'chat') ui._chat = null;
     ui.panelName = null;
     game.onPanel?.(null, was);
   };
@@ -364,7 +446,16 @@ export function createUI(game) {
           h('div.item-body', h('b', L(d.name), store.has('met', d.id) ? ' ✓' : ''), h('span', L(d.role) + ' · ' + L(d.status))),
           h('div.item-end', z ? L(z) : '', h('br'), t('away', { d: Math.round(n.dist) })));
       }));
-      if (!rows.length) list.append(h('p.small', t('nobody')));
+      const online = [...game.live.peers.values()].filter((v) => !q || (v.name + ' ' + v.status).toLowerCase().includes(q)).sort((a, b) => (a.dist ?? 1e9) - (b.dist ?? 1e9)).slice(0, 12);
+      if (online.length) {
+        list.prepend(h('div.k', '🟢 ', t('online_now')), ...online.map((v) =>
+          h('button.item', { type: 'button', onclick: () => { ui.close(); game.guideTo({ x: v.tx, z: v.tz, label: v.name, peer: v }); } },
+            h('div.avatar', { style: { background: '#1f9a55' } }, v.name[0]),
+            h('div.item-body', h('b', v.name), h('span', v.status || t('visitor_tag'))),
+            h('div.item-end', t('away', { d: Math.round(Math.hypot(v.tx - game.player.pos.x, v.tz - game.player.pos.z)) })))),
+          h('div.k', t('residents')));
+      }
+      if (!rows.length && !online.length) list.append(h('p.small', t('nobody')));
     };
     input.oninput = draw;
     show('find', 'right', ...head(null, t('find'), t('find_sub')), input, list);
@@ -522,6 +613,88 @@ export function createUI(game) {
       h('div.row', h('span'), h('button.btn.btn--ghost', { type: 'button', onclick: () => ui.close() }, t('stand_up'))));
   };
 
+  P.golive = () => {
+    const ok = h('input', { type: 'checkbox', checked: !!store.get('liveOk') });
+    const go = h('button.btn', { type: 'button', disabled: !ok.checked, onclick: () => { store.set('liveOk', true); ui.close(); game.goLive(); } }, '🟢 ', t('go_live'), ' ▸');
+    ok.onchange = () => (go.disabled = !ok.checked);
+    show('golive', 'center', ...head('🟢', t('golive_title')),
+      h('ul.rules', ...['golive_1', 'golive_2', 'golive_3', 'golive_4'].map((k) => h('li', t(k)))),
+      h('label.check', ok, h('span', t('golive_ok'))),
+      h('div.row', h('button.btn.btn--ghost', { type: 'button', onclick: () => ui.close() }, t('not_now')), go));
+  };
+
+  P.chat = (startTab) => {
+    const live = game.live;
+    if (!live.online) return game.goLive();
+    const tabsEl = h('div.tabs'), listEl = h('div.chatlist'), noteEl = h('p.small'), endEl = h('div');
+    const input = h('input.input', { type: 'text', maxLength: 200, autocomplete: 'off', enterKeyHint: 'send' });
+    const C = (ui._chat = { cur: startTab || ui._chatTab || 'near' });
+    const dmId = () => (C.cur.startsWith('dm:') ? C.cur.slice(3) : null);
+    C.tabs = () => {
+      const open = [...live.links].filter(([, st]) => st === 'open').map(([id]) => id);
+      if (dmId() && !open.includes(dmId())) C.cur = 'near';
+      const tab = (key, label) => h('button' + (C.cur === key ? '.on' : ''), { type: 'button', onclick: () => C.pick(key) }, label, unread.get(key) ? h('span.n', unread.get(key)) : null);
+      tabsEl.replaceChildren(tab('near', '📍 ' + t('chat_near')), tab('town', '🏘 ' + t('chat_town')), ...open.map((id) => tab('dm:' + id, '🔒 ' + (live.peers.get(id)?.name || '…'))));
+    };
+    C.list = () => {
+      const log = live.logs[C.cur] || [];
+      const kind = dmId() ? 'dm' : C.cur;
+      listEl.replaceChildren(...(log.length ? log.map((m) => h('div.msg' + (m.mine ? '.mine' : ''), h('b', m.mine ? t('you') : m.name), m.text)) : [h('p.small', t('chat_empty_' + kind))]));
+      listEl.scrollTop = listEl.scrollHeight;
+      input.placeholder = t('chat_ph_' + kind);
+      noteEl.textContent = t(dmId() ? 'chat_private' : 'chat_public');
+      endEl.replaceChildren(dmId() ? h('button.link', { type: 'button', onclick: () => live.close(dmId()) }, t('end_chat')) : '');
+    };
+    C.pick = (key) => {
+      C.cur = ui._chatTab = key;
+      unread.delete(key);
+      C.tabs();
+      C.list();
+      ui.liveChanged();
+    };
+    const send = async () => {
+      const text = input.value;
+      if (!text.trim()) return;
+      const sent = dmId() ? await live.whisper(dmId(), text) : live.say(text, C.cur);
+      if (sent) input.value = '';
+      else ui.toast(t('slow_down'));
+      input.focus();
+    };
+    input.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        send();
+      }
+    };
+    show('chat', 'left', ...head('💬', t('chat_title')), tabsEl, listEl,
+      h('div.chatform', input, h('button.btn', { type: 'button', onclick: send }, t('send'))),
+      noteEl, endEl,
+      h('hr.perf'),
+      h('div.row', { style: { marginTop: 0 } }, h('span.small', '🟢 ', t('live_title')), h('button.link', { type: 'button', onclick: () => { ui.close(); game.leaveLive(); } }, t('leave_live'))));
+    C.pick(C.cur);
+    if (!touch) input.focus();
+  };
+
+  P.visitor = (v) => {
+    const live = game.live;
+    show('visitor', 'left',
+      h('div.panel-top', h('span.tag', { style: { background: 'var(--green)' } }, t('visitor_tag')), escBtn()),
+      h('div.who', h('div.avatar', { style: { background: '#1f9a55' } }, v.name[0]), h('h2.panel-title', v.name)),
+      v.status ? h('div.status', v.status) : null,
+      h('p.small', { style: { marginTop: '10px' } }, t('visitor_note')),
+      h('div.row',
+        h('button.btn', { type: 'button', onclick: () => { live.wave(); game.player.person.wave(1.6); sfx.hello(); } }, '👋 ', t('wave')),
+        h('button.btn.btn--gold', { type: 'button', onclick: () => {
+          if (live.links.get(v.id) === 'open') return ui.open('chat', 'dm:' + v.id);
+          live.ask(v.id);
+          ui.toast(t('asked', { name: v.name }));
+        } }, '🔒 ', t('ask_private'))),
+      h('hr.perf'),
+      h('div.row', { style: { marginTop: 0 } },
+        h('button.link', { type: 'button', onclick: () => { if (confirm(t('block_sure', { name: v.name }))) { live.block(v.id); ui.close(); ui.toast(t('blocked')); } } }, '🚫 ', t('block')),
+        h('a.link', { href: game.reportUrl(v), target: '_blank', rel: 'noopener' }, '⚑ ', t('report'))));
+  };
+
   P.first = () => {
     const done = store.get('done');
     const M = [['meet', '🙏'], ['chai', '☕'], ['auto', '🛺'], ['wall', '📌'], ['stamp', '🎫']];
@@ -602,7 +775,7 @@ export function createUI(game) {
     if (!hud.hidden) drawHud();
     promptText = '';
     guideEl._label = null;
-    if (ui.panelName && ui.panelName !== 'profile' && ui.panelName !== 'wall' && ui.panelName !== 'chai') P[ui.panelName]();
+    if (ui.panelName && !['profile', 'wall', 'chai', 'visitor', 'chat', 'golive'].includes(ui.panelName)) P[ui.panelName]();
     else if (ui.panelName) ui.close();
   });
 

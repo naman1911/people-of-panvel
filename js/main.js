@@ -17,7 +17,8 @@ import { signGroup, setSignNight } from './world/signs.js';
 import { World } from './world/world.js';
 import * as M from './world/models.js';
 import { Input } from './input.js';
-import { Player, CameraRig, Residents, Crowd, Traffic, Rickshaws, Strays, Walkers, LocalTrain, buildModel } from './entities/actors.js';
+import { Player, CameraRig, Residents, Crowd, Traffic, Rickshaws, Strays, Walkers, LocalTrain, Visitors, buildModel } from './entities/actors.js';
+import { Live } from './net/live.js';
 import { PEOPLE, POSTERS } from './data/people.js';
 import { HUBS, STAMPS, SPAWN, TITLE_SHOT, zoneAt } from './data/places.js';
 import { createUI } from './ui.js';
@@ -120,6 +121,8 @@ async function start() {
   const rickshaws = new Rickshaws(scene, world, lib, spots.autos);
   const strays = new Strays(scene, world, lib, spots.hubs.map((s, i) => ({ x: s.x + 5 + i, z: s.z - 6 })));
 
+  const live = new Live();
+  const visitors = new Visitors(scene, world);
   const walkers = new Walkers(scene, town.ctx.promenades || [], light ? 6 : 16);
   const train = spots.trainPath ? new LocalTrain(scene, lib, spots.trainPath) : null;
 
@@ -220,7 +223,27 @@ async function start() {
   rig.setFirstPerson((params.get('view') || store.get('view')) !== 'tp');
 
   const game = {
-    input, atmo, residents, player, strays, store,
+    input, atmo, residents, player, strays, store, live,
+    /** Become visible to other visitors. Needs a character and agreement to the rules first. */
+    goLive() {
+      const me = store.get('me');
+      if (!me) {
+        ui.toast(t('need_me'));
+        return ui.open('me');
+      }
+      if (!store.get('liveOk')) return ui.open('golive');
+      store.set('live', true);
+      live.start(me, { x: player.pos.x, z: player.pos.z });
+    },
+    leaveLive() {
+      store.set('live', false);
+      live.stop();
+      ui.toast(t('live_left'));
+    },
+    reportUrl(v) {
+      const body = `Name shown: ${v.name}\nId: ${v.id}\nWhen: ${new Date().toISOString()}\n\nWhat happened:\n`;
+      return `${REPO}/issues/new?title=${encodeURIComponent('Report: ' + v.name)}&body=${encodeURIComponent(body)}`;
+    },
     // the 2-D map is drawn the first time it is needed, not during loading
     get map() {
       return (this._map ||= createMap(data));
@@ -285,9 +308,13 @@ async function start() {
       });
     },
     saveMe(me) {
+      const first = !store.get('me');
       store.set('me', me);
       player.setLook(me.look);
+      live.setMe(me);
       ui.showHud();
+      // a new character's natural next step is to meet people
+      if (first && !live.want) setTimeout(() => !ui.panel && game.goLive(), 900);
     },
     previewLook: (look) => player.setLook(look),
     addMeUrl() {
@@ -317,7 +344,7 @@ async function start() {
     },
     onPanel(name, was) {
       if (name) input.unlock();
-      input.enabled = !name || name === 'profile' || name === 'chai' || name === 'katta';
+      input.enabled = !name || ['profile', 'chai', 'katta', 'chat', 'visitor'].includes(name);
       if (was === 'chai' && player.mode === 'sit') player.stand();
       if (was === 'me') {
         const me = store.get('me');
@@ -326,6 +353,29 @@ async function start() {
     },
   };
   const ui = createUI(game);
+  live.on.status = (st) => {
+    ui.liveChanged();
+    if (st === 'retry' && live.attempt === 3) ui.toast(t('live_down'));
+  };
+  live.on.peers = (p) => {
+    ui.liveChanged();
+    if (p && Math.hypot(p.tx - player.pos.x, p.tz - player.pos.z) < 150) {
+      ui.toast('🟢 ' + t('joined', { name: p.name }));
+      sfx.pop();
+    }
+  };
+  live.on.chat = (channel, msg) => {
+    ui.onChat(channel, msg);
+    if (!msg.mine) sfx.pop();
+  };
+  live.on.request = (p) => ui.request(p);
+  const names = new Map();
+  live.on.link = (id, st) => {
+    const p = live.peers.get(id);
+    if (p) names.set(id, p.name);
+    ui.onLink(id, st, names.get(id) || '…');
+  };
+  window.addEventListener('pagehide', () => live.stop());
   input.wantLock = () => state === 'play' && rig.fp && !ui.panel;
   const touchDevice = isTouch();
 
@@ -341,6 +391,7 @@ async function start() {
       if (score < 1 && (!best || score < best.score)) best = { score, make };
     };
     for (const n of residents.list) if (n.dist < 3.4) offer(n.dist, 3.4, () => ({ text: t('meet', { name: L(n.def.name).toUpperCase() }), id: n.def.id, run: () => ui.open('profile', n) }));
+    for (const v of live.peers.values()) if (v.person && v.dist < 3.2) offer(v.dist, 3.2, () => ({ text: t('meet_live', { name: v.name.toUpperCase() }), id: v.id, run: () => ui.open('visitor', v) }));
     for (const v of rickshaws.list) offer(Math.hypot(v.x - px, v.z - pz), 3, () => ({ text: t('drive'), run: () => { player.enter(v); game.mission('auto'); sfx.horn(); } }));
     for (const s of spots.seats) offer(Math.hypot(s.x - px, s.z - pz), 2, () => ({ text: t(s.chai ? 'sit_chai' : 'sit'), run: () => { player.sit(s); if (s.chai) ui.open('chai', s); } }));
     for (const b of spots.boards) offer(Math.hypot(b.x - px, b.z - pz), 3.6, () => ({ text: t('read_wall'), run: () => ui.open('wall', b) }));
@@ -355,7 +406,9 @@ async function start() {
       return;
     }
     if (code === 'Escape') return ui.panel ? ui.close() : game.guideTo(null);
+    if (code === 'Enter' && live.online) return ui.open('chat');
     if (code === 'KeyE' || code === 'Enter') return action?.run();
+    if (code === 'KeyL') return live.state === 'off' ? game.goLive() : ui.open('chat');
     const map = { KeyF: 'find', KeyT: 'travel', KeyB: 'darshan', KeyC: 'katta', KeyM: 'me', KeyH: 'help', Slash: 'help', KeyN: 'map', Tab: 'map' };
     if (map[code]) ui.toggle(map[code]);
     if (code === 'KeyV') game.toggleView();
@@ -373,6 +426,7 @@ async function start() {
     ui.setZone(zoneAt(player.pos.x, player.pos.z));
     ui.showHud();
     if (!store.has('seenTips', 'welcome') && !at) ui.note(t('welcome'), 'welcome');
+    if ((store.get('live') || params.has('live')) && store.get('liveOk') && store.get('me')) game.goLive();
     if (store.get('hints') && store.get('done').length < 5 && !params.has('play')) setTimeout(() => !ui.panel && ui.open('first'), 1400);
     if (params.has('panel')) setTimeout(() => ui.open(params.get('panel'), params.get('panel') === 'profile' ? residents.list[0] : undefined), 300);
   }
@@ -408,6 +462,9 @@ async function start() {
       traffic.update(dt, player);
       strays.update(dt, player);
       walkers.update(dt, player);
+      // facing: where you look in first person, where the body points otherwise
+      live.update(dt, player.pos.x, player.pos.z, rig.fp && player.mode === 'walk' ? rig.yaw + Math.PI : player.yaw, player.speed, player.mode === 'walk' ? 0 : player.mode === 'sit' ? 1 : 2);
+      visitors.update(dt, live, player);
       train?.update(dt, (ev) => {
         // you hear it if you are near the station
         if (Math.hypot(train.path.pts[0][0] - player.pos.x, train.path.pts[0][1] - player.pos.z) < 900 && zoneAt(player.pos.x, player.pos.z).id === 'junction') {
@@ -417,8 +474,8 @@ async function start() {
       });
       focus.set(player.pos.x, 0, player.pos.z);
 
-      action = ui.panel && ui.panelName !== 'profile' && ui.panelName !== 'katta' ? null : findAction();
-      if (ui.panelName === 'profile' && action?.id) action = null;
+      action = ui.panel && !['profile', 'katta', 'chat'].includes(ui.panelName) ? null : findAction();
+      if ((ui.panelName === 'profile' || ui.panelName === 'visitor') && action?.id) action = null;
       ui.setPrompt(action ? action.text : '', () => action?.run());
 
       // footsteps, in time with the stride
@@ -476,6 +533,7 @@ async function start() {
       }
       if (guide) {
         if (guide.person) (guide.x = guide.person.x), (guide.z = guide.person.z);
+        if (guide.peer) (guide.x = guide.peer.x), (guide.z = guide.peer.z);
         const dx = guide.x - player.pos.x, dz = guide.z - player.pos.z, d = Math.hypot(dx, dz);
         beacon.position.set(guide.x, 30, guide.z);
         beacon.material.opacity = 0.18 + Math.sin(time * 3) * 0.08;
@@ -552,7 +610,7 @@ async function start() {
   }
   mark('entities');
   frame();
-  window.__pop = { scene, camera, R, atmo, town, lib, world, player, rig, residents, game, ui, rickshaws, spots, train, walkers };
+  window.__pop = { scene, camera, R, atmo, town, lib, world, player, rig, residents, game, ui, rickshaws, spots, train, walkers, live, visitors };
   void mulberry32;
 }
 

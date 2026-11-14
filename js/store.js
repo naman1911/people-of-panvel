@@ -15,6 +15,10 @@ const defaults = () => ({
   hints: true,
   view: 'fp', // 'fp' first person | 'tp' third person
   quality: null,
+  netId: null, // random id used on the live relay
+  blocked: [], // people this visitor has blocked
+  liveOk: false, // has read and accepted the live rules
+  live: false, // was live last time, so rejoin
 });
 
 let state = defaults();

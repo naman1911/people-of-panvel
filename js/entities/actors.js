@@ -675,3 +675,65 @@ export class LocalTrain {
     }
   }
 }
+
+// ---- other visitors, live ------------------------------------------------------------
+
+export class Visitors {
+  constructor(scene, world) {
+    this.scene = scene;
+    this.world = world;
+    this.shown = new Map(); // peer id -> Person
+    this.rnd = mulberry32(31337);
+  }
+  update(dt, live, player) {
+    const now = Date.now();
+    const k = 1 - Math.exp(-dt * 9);
+    let count = 0;
+    for (const p of live.peers.values()) {
+      // ease towards the last reported position; snap if they jumped (rickshaw ride, rejoin)
+      if (Math.hypot(p.tx - p.x, p.tz - p.z) > 14) (p.x = p.tx), (p.z = p.tz);
+      p.x += (p.tx - p.x) * k;
+      p.z += (p.tz - p.z) * k;
+      p.yaw += angDiff(p.yaw, p.tyaw) * k;
+      const d = Math.hypot(p.x - player.pos.x, p.z - player.pos.z);
+      p.dist = d;
+      const want = d < 170 && count < 30;
+      let person = this.shown.get(p.id);
+      if (!want) {
+        if (person) {
+          person.dispose();
+          this.shown.delete(p.id);
+        }
+        p.person = null;
+        continue;
+      }
+      count++;
+      if (!person || person.rev !== p.lookRev) {
+        if (person) person.dispose();
+        person = new Person(p.look, this.rnd);
+        person.rev = p.lookRev;
+        this.scene.add(person.root);
+        this.shown.set(p.id, person);
+      }
+      p.person = person;
+      const seated = p.mode !== 0;
+      person.root.position.set(p.x, this.world.heightAt(p.x, p.z) + (seated ? -0.06 : 0), p.z);
+      person.root.rotation.y = p.yaw;
+      if (p.wave && now - p.wave < 500) {
+        person.wave(1.6);
+        p.wave = 0;
+      }
+      // if news stops arriving, they stand still rather than walk on the spot
+      const moving = now - p.moved < 900 ? p.v : 0;
+      person.update(dt, seated ? 0 : moving, seated ? 'sit' : 'stand');
+      person.setShadows(d < 45);
+      if (p.say && now > p.sayUntil) p.say = null;
+    }
+    for (const [id, person] of this.shown) {
+      if (!live.peers.has(id)) {
+        person.dispose();
+        this.shown.delete(id);
+      }
+    }
+  }
+}
