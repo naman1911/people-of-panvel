@@ -1,0 +1,11 @@
+{
+  "name": "People of Panvel",
+  "short_name": "Panvel",
+  "description": "Walk the real streets of Panvel in 3D and meet its people.",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#10252b",
+  "theme_color": "#10252b",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

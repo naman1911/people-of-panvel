@@ -33,7 +33,7 @@ python3 -m http.server 8000
 
 Then open <http://localhost:8000>. Opening `index.html` straight from disk will not work, because browsers block module and data loading from `file://`.
 
-To publish it, enable GitHub Pages for the repository and serve from the root of the branch.
+The live site is <https://peopleofpanvel.com>. The `CNAME` file ties that domain to GitHub Pages, which serves the repository root as it is.
 
 ## Controls
 
