@@ -12,8 +12,9 @@ const defaults = () => ({
   done: [], // first-steps mission ids
   seenTips: [], // district ids whose welcome note was dismissed
   sound: true,
-  district: null,
   hints: true,
+  view: 'fp', // 'fp' first person | 'tp' third person
+  quality: null,
 });
 
 let state = defaults();

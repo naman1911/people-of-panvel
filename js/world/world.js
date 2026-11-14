@@ -38,6 +38,18 @@ export class World {
       a.push(r);
     }
     this.streetGrid = town.ctx.roadGrid;
+    this.namedGrid = town.ctx.namedGrid;
+    this.allRoads = data.roads;
+  }
+
+  /** Name of the street you are standing on or beside, if the map knows it. */
+  streetNameAt(x, z) {
+    let best = null;
+    this.namedGrid?.near(x, z, 16, (s) => {
+      const q = segDist(x, z, s[0], s[1], s[2], s[3]);
+      if (q.d < 16 && (!best || q.d < best.d)) best = { d: q.d, r: this.allRoads[s[4]] };
+    });
+    return best ? best.r.n : null;
   }
 
   addSolid(x, z, r) {

@@ -73,7 +73,29 @@ export function createUI(game) {
   const keys = h('div.hud-keys');
   const promptBtn = h('button.btn.prompt', { type: 'button', hidden: true });
   const guideEl = h('div.pill.guide', { hidden: true });
-  hud.append(board, center, right, dock, keys, promptBtn, guideEl);
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const MINI = 168;
+  const mini = h('canvas.minimap', { width: MINI * dpr, height: MINI * dpr, title: 'Map', onclick: () => ui.toggle('map') });
+  const miniCtx = mini.getContext('2d');
+  miniCtx.scale(dpr, dpr);
+  const lookHint = h('div.pill.lookhint', { hidden: true });
+  hud.append(board, center, right, dock, keys, promptBtn, guideEl, mini, lookHint);
+  let street = '';
+  ui.setStreet = (name) => {
+    if (name === street) return;
+    street = name;
+    drawArea();
+  };
+  const drawArea = () => {
+    if (!zone) return;
+    board.children[2].textContent = street ? '📍 ' + ((getLang() === 'mr' && game.streetMr(street)) || street) : 'PANVEL · ' + L(zone.area);
+  };
+  ui.drawMini = (px, pz, heading, guide) => game.map.drawMini(miniCtx, MINI, px, pz, heading, guide, game);
+  ui.setLookHint = (show) => {
+    if (lookHint.hidden === !show) return;
+    lookHint.hidden = !show;
+    if (show) lookHint.textContent = t('click_look');
+  };
 
   let zone = null, noteEl = null, clockEl = null, wxEl = null, countEl = null;
   const chip = (em, label, key, fn) => h('button.chip', { type: 'button', onclick: fn, title: label }, h('span.em', em), h('span.lbl', label), key && !touch ? h('kbd', key) : null);
@@ -83,7 +105,7 @@ export function createUI(game) {
     if (zone) {
       board.children[0].textContent = zone.mr;
       board.children[1].textContent = zone.en;
-      board.children[2].textContent = 'PANVEL · ' + L(zone.area);
+      drawArea();
     }
     // centre: guest bar + welcome note
     center.replaceChildren();
@@ -104,11 +126,14 @@ export function createUI(game) {
       h('div', { style: { display: 'flex', gap: '6px' } }, clockEl, wxEl),
       countEl);
     dock.replaceChildren(
+      chip('👁', t('view'), 'V', () => game.toggleView()),
+      chip('🗺', t('map'), 'N', () => ui.toggle('map')),
       chip('🎫', t('darshan'), 'B', () => ui.open('darshan')),
       chip('🫖', t('katta'), 'C', () => ui.open('katta')),
       chip('🙂', t('me'), 'M', () => ui.open('me')),
       chip('❔', t('help'), 'H', () => ui.open('help')));
     keys.replaceChildren(...[['WASD', 'k_move'], ['SHIFT', 'k_run'], ['🖱', 'k_look'], ['E', 'k_use']].map(([k, s]) => h('span', h('kbd', k), t(s))));
+    lookHint.textContent = t('click_look');
     ui.tick();
   }
   ui.showHud = () => {
@@ -287,6 +312,34 @@ export function createUI(game) {
       h('hr.perf'),
       h('p.small', t('fictional')));
     ui.tick();
+  };
+
+  P.map = () => {
+    const w = Math.min(720, window.innerWidth - 64);
+    const cvs = h('canvas.fullmap', { width: w * dpr, height: 10 });
+    const g = cvs.getContext('2d');
+    let info = null;
+    const draw = () => {
+      const hgt = Math.round((game.map.H / game.map.W) * w);
+      if (cvs.height !== hgt * dpr) {
+        cvs.height = hgt * dpr;
+        cvs.style.width = w + 'px';
+        cvs.style.height = hgt + 'px';
+      }
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const pl = game.player;
+      info = game.map.drawFull(g, w, pl.pos.x, pl.pos.z, game.heading(), game.guide(), game);
+    };
+    cvs.onclick = (e) => {
+      const r = cvs.getBoundingClientRect();
+      const x = (e.clientX - r.left) / info.scale + game.map.x0, z = (e.clientY - r.top) / info.scale + game.map.z0;
+      game.guideTo({ x, z, label: t('map_pin') });
+      draw();
+    };
+    show('map', 'center wide', ...head('🗺', t('map_title'), t('map_sub')), cvs,
+      h('p.small', '🔴 ', t('map_you'), ' · ⚫ ', t('travel'), ' · ○ ', t('katta_met'), ' · © OpenStreetMap contributors'));
+    draw();
+    ui._mapTimer = setInterval(() => (ui.panelName === 'map' ? draw() : clearInterval(ui._mapTimer)), 500);
   };
 
   P.find = () => {
@@ -485,7 +538,7 @@ export function createUI(game) {
       h('div.keys',
         ...(touch
           ? [['👆', t('k_move')], ['👉', t('k_look')], ['E', t('k_use')]]
-          : [['WASD', t('k_move')], ['SHIFT', t('k_run')], ['🖱 / ← →', t('k_look')], ['SCROLL', t('k_zoom')], ['E', t('k_use')], ['F', t('find')], ['T', t('travel')], ['B', t('darshan')], ['C', t('katta')], ['M', t('me')], ['ESC', t('k_close')]]
+          : [['WASD', t('k_move')], ['SHIFT', t('k_run')], ['🖱 / ← →', t('k_look')], ['V', t('view_help')], ['E', t('k_use')], ['N', t('map')], ['F', t('find')], ['T', t('travel')], ['B', t('darshan')], ['C', t('katta')], ['M', t('me')], ['ESC', t('k_close')]]
         ).flatMap(([k, s]) => [h('kbd', k), h('span', s)])),
       h('div.row', h('button.btn.btn--ghost.btn--sm', { type: 'button', onclick: () => ui.open('first') }, '👋 ', t('first_title'))),
       h('hr.perf'),
@@ -505,6 +558,7 @@ export function createUI(game) {
     P[name](arg);
   };
   ui.toggle = (name, arg) => (ui.panelName === name ? ui.close() : ui.open(name, arg));
+  ui.redrawHud = () => !hud.hidden && drawHud();
 
   // ---- travel overlay --------------------------------------------------------------
   ui.travelFx = (hub, midway) => {

@@ -79,6 +79,14 @@ button.pill:hover{background:var(--ink-3)}
 .guide .arrow{display:inline-block;font-size:17px;transition:transform .1s linear}
 .guide .x{color:var(--muted);padding:0 2px 0 6px}
 
+/* corner map */
+.minimap{position:absolute;left:calc(14px + var(--safe-l));bottom:calc(46px + var(--safe-b));width:168px;height:168px;border-radius:50%;box-shadow:0 0 0 3px var(--ink),0 0 0 5px rgba(251,241,220,.35),0 10px 30px rgba(0,0,0,.45);cursor:pointer;background:#efe7d6}
+.fullmap{display:block;border-radius:10px;margin:10px auto 6px;cursor:crosshair;max-width:100%;box-shadow:0 0 0 2px rgba(251,241,220,.25)}
+.lookhint{position:absolute;left:50%;bottom:calc(24vh + var(--safe-b));transform:translateX(-50%);font-family:var(--display);font-weight:700;letter-spacing:1px;font-size:12px;animation:pulse 2.4s ease-in-out infinite;pointer-events:none!important}
+@keyframes pulse{50%{opacity:.5}}
+/* a small dot marks the centre of your view in first person */
+.reticle{position:fixed;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:rgba(255,255,255,.75);box-shadow:0 0 0 1.5px rgba(0,0,0,.35);pointer-events:none}
+
 /* name plates above people */
 .plate{position:absolute;left:0;top:0;display:flex;flex-direction:column;align-items:center;will-change:transform;white-space:nowrap;transition:opacity .2s}
 .plate-name{font-family:var(--display);font-weight:800;font-size:14px;letter-spacing:.5px;color:#fff;background:rgba(16,37,43,.86);border-radius:7px;padding:2px 9px 0;box-shadow:inset 0 -3px 0 var(--accent)}
@@ -193,9 +201,10 @@ button.item:hover{border-color:rgba(255,182,39,.55);background:rgba(255,182,39,.
 .touch-btn{position:absolute;right:calc(18px + var(--safe-r));bottom:calc(86px + var(--safe-b));width:70px;height:70px;border-radius:50%;background:var(--accent);color:#fff;font-family:var(--display);font-weight:800;font-size:15px;box-shadow:0 5px 0 var(--accent-d);pointer-events:auto;display:none}
 .touch-btn.on{display:block}
 
-@media (max-width:1100px){.hud-center{max-width:min(520px,calc(100vw - 380px))}.hud-keys{display:none}}
+@media (max-width:1100px){.hud-center{max-width:min(520px,calc(100vw - 380px))}.hud-keys{display:none}.minimap{bottom:calc(14px + var(--safe-b))}}
 @media (max-width:760px){
   body{font-size:14px}
+  .minimap{width:96px;height:96px;left:calc(10px + var(--safe-l));bottom:auto;top:calc(58px + var(--safe-t))}
   .board{padding:5px 12px 3px;min-width:0}.board-mr{font-size:19px}.board-en{font-size:11px;letter-spacing:1.6px}.board-area{display:none}
   .hud-center{top:calc(64px + var(--safe-t));max-width:calc(100vw - 24px);width:calc(100vw - 24px)}
   .guestbar{width:100%;justify-content:space-between}

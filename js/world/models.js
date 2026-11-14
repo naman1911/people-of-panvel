@@ -65,8 +65,17 @@ export function auto(m) {
   wheel(m, -0.78, -0.6, 0.24, 0.14, -1);
 }
 
-export function scooter(m, rnd) {
+export function scooter(m, rnd, rider) {
   const paint = BIKE_PAINT[(rnd() * BIKE_PAINT.length) | 0];
+  if (rider) {
+    const shirt = ['#e8e4d8', '#4e6a8f', '#a5d6a7', '#c2185b', '#f9a825', '#37474f'][(rnd() * 6) | 0];
+    m.box(-0.22, 0.82, 0, 0.3, 0.55, 0.36, shirt, 'flat', { rz: -0.12 });
+    m.box(0.1, 1.12, 0.17, 0.5, 0.09, 0.09, shirt, 'flat', { rz: -0.35 });
+    m.box(0.1, 1.12, -0.17, 0.5, 0.09, 0.09, shirt, 'flat', { rz: -0.35 });
+    m.box(0.02, 0.5, 0.17, 0.42, 0.14, 0.13, '#37474f', 'flat');
+    m.box(0.02, 0.5, -0.17, 0.42, 0.14, 0.13, '#37474f', 'flat');
+    m.ball(-0.16, 1.52, 0, 0.15, ['#1d1d1f', '#b3261e', '#f2f2f0', '#1f3c6e'][(rnd() * 4) | 0], 'gloss', { detail: 1 });
+  }
   const bike = rnd() < 0.45;
   m.box(-0.1, 0.3, 0, 1.0, 0.42, 0.34, paint, 'gloss');
   m.box(-0.25, 0.72, 0, 0.72, 0.1, 0.32, '#1a1a1c', 'flat'); // seat

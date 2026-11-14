@@ -25,9 +25,19 @@ const S = {
   make_me: { en: 'MAKE MY CHARACTER', mr: 'माझं पात्र बनवा' },
   people_count: { en: '{n} Panvelkars · met {m}', mr: '{n} पनवेलकर · भेटले {m}' },
 
+  map: { en: 'MAP', mr: 'नकाशा' },
+  map_title: { en: 'PANVEL', mr: 'पनवेल' },
+  map_sub: { en: 'The real streets, from OpenStreetMap. Click anywhere to set a marker.', mr: 'खरे रस्ते, OpenStreetMap वरून. खूण लावण्यासाठी कुठेही क्लिक करा.' },
+  map_pin: { en: 'Marker', mr: 'खूण' },
+  map_you: { en: 'You', mr: 'तुम्ही' },
+  view: { en: 'VIEW', mr: 'दृश्य' },
+  view_fp: { en: 'FIRST PERSON', mr: 'स्वतःच्या नजरेतून' },
+  view_tp: { en: 'THIRD PERSON', mr: 'मागून' },
+  view_help: { en: 'Switch between your own eyes and a view from behind', mr: 'स्वतःची नजर आणि मागून दिसणारं दृश्य यांत बदल' },
+  click_look: { en: 'CLICK TO LOOK AROUND · ESC TO RELEASE', mr: 'आजूबाजूला पाहण्यासाठी क्लिक करा · सोडण्यासाठी ESC' },
   k_move: { en: 'MOVE', mr: 'चाला' },
   k_run: { en: 'RUN', mr: 'धावा' },
-  k_look: { en: 'DRAG TO LOOK', mr: 'ओढून पाहा' },
+  k_look: { en: 'LOOK', mr: 'पाहा' },
   k_zoom: { en: 'ZOOM', mr: 'झूम' },
   k_use: { en: 'INTERACT', mr: 'वापरा' },
   k_close: { en: 'CLOSE', mr: 'बंद' },
@@ -126,7 +136,7 @@ const S = {
   off: { en: 'OFF', mr: 'बंद' },
   reset: { en: 'RESET MY PROGRESS', mr: 'माझी प्रगती पुसा' },
   edge: { en: 'That’s as far as this map goes, for now.', mr: 'सध्या नकाशा इथपर्यंतच आहे.' },
-  welcome: { en: 'You’re on the south bank of Vadale Talav. Walk the promenade, find the tea stall, and take a rickshaw when your feet give up.', mr: 'तुम्ही वडाळे तलावाच्या दक्षिण काठावर आहात. काठाने फिरा, चहाची टपरी शोधा आणि पाय दुखले की रिक्षा पकडा.' },
+  welcome: { en: 'You’re on the south bank of Vadale Talav, at real walking pace. Stroll the promenade, find the tea stall, and take a rickshaw when your feet give up.', mr: 'तुम्ही वडाळे तलावाच्या दक्षिण काठावर आहात, खऱ्या चालण्याच्या वेगाने. काठाने फिरा, चहाची टपरी शोधा आणि पाय दुखले की रिक्षा पकडा.' },
 };
 
 let lang = store.get('lang') || ((navigator.language || 'en').startsWith('mr') ? 'mr' : 'en');

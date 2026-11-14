@@ -1,0 +1,73 @@
+// Marathi names for Panvel's streets as they appear in OpenStreetMap.
+// Streets not listed here show their English name only.
+
+export const STREET_MR = {
+  'Lokmanya Tilak Road': 'लोकमान्य टिळक रोड',
+  'Mahatma Gandhi Road': 'महात्मा गांधी रोड',
+  'Uran Road': 'उरण रोड',
+  'Matheran Road': 'माथेरान रोड',
+  'Vijay Marg - Matheran Road': 'विजय मार्ग · माथेरान रोड',
+  'Panvel Station Road': 'पनवेल स्टेशन रोड',
+  'Panvel Road': 'पनवेल रोड',
+  'Shivaji Road': 'शिवाजी रोड',
+  'Vasudev Balwant Phadke Road': 'वासुदेव बळवंत फडके रोड',
+  'Takka Road': 'टक्का रोड',
+  'Forest Colony Road': 'फॉरेस्ट कॉलनी रोड',
+  'Thane Naka Road': 'ठाणे नाका रोड',
+  'Appasaheb Panhale Road': 'अप्पासाहेब पन्हाळे रोड',
+  'Maharana Pratap Road': 'महाराणा प्रताप रोड',
+  'Old Panvel Bhaji Market': 'भाजी मार्केट रोड',
+  'Swami Samarth Road': 'स्वामी समर्थ रोड',
+  'Deshmukh Lane': 'देशमुख आळी',
+  'M.Phule Road': 'महात्मा फुले रोड',
+  'MCCH Society Street': 'एमसीसीएच सोसायटी रोड',
+  'Purohit Hospital Street': 'पुरोहित हॉस्पिटल रोड',
+  'Panvel Station Circle': 'पनवेल स्टेशन सर्कल',
+  'College Road': 'कॉलेज रोड',
+  'Asian Highway 47': 'मुंबई–पुणे महामार्ग',
+  'Panvel Flyover': 'पनवेल उड्डाणपूल',
+  'New Panvel Flyover': 'नवीन पनवेल उड्डाणपूल',
+};
+
+/** What kind of place a map feature is, for its signboard. */
+export const KIND_STYLE = {
+  hospital: { mr: 'रुग्णालय', bg: '#f7f7f2', fg: '#b3261e', mark: '✚ ' },
+  clinic: { mr: 'दवाखाना', bg: '#f7f7f2', fg: '#1f6b4a', mark: '✚ ' },
+  doctors: { mr: 'दवाखाना', bg: '#f7f7f2', fg: '#1f6b4a', mark: '✚ ' },
+  dentist: { mr: 'दंत चिकित्सालय', bg: '#f7f7f2', fg: '#1f5ba8', mark: '' },
+  pharmacy: { mr: 'औषधालय', bg: '#12613a', fg: '#ffffff', mark: '✚ ' },
+  blood_bank: { mr: 'रक्तपेढी', bg: '#b3261e', fg: '#ffffff', mark: '' },
+  bank: { mr: 'बँक', bg: '#12305c', fg: '#ffffff', mark: '' },
+  atm: { mr: 'एटीएम', bg: '#12305c', fg: '#ffffff', mark: '' },
+  restaurant: { mr: 'उपाहारगृह', bg: '#6d1f1a', fg: '#ffe2a8', mark: '' },
+  fast_food: { mr: 'नाश्ता सेंटर', bg: '#d9480f', fg: '#fff7d6', mark: '' },
+  cafe: { mr: 'कॅफे', bg: '#3b2a20', fg: '#f5d7a1', mark: '' },
+  hotel: { mr: 'हॉटेल', bg: '#14422f', fg: '#f2d27a', mark: '' },
+  hostel: { mr: 'वसतिगृह', bg: '#394b59', fg: '#ffffff', mark: '' },
+  school: { mr: 'शाळा', bg: '#f2c21a', fg: '#1b2a6b', mark: '' },
+  college: { mr: 'महाविद्यालय', bg: '#f2c21a', fg: '#1b2a6b', mark: '' },
+  fire_station: { mr: 'अग्निशमन केंद्र', bg: '#b3261e', fg: '#fff7d6', mark: '' },
+  fuel: { mr: 'पेट्रोल पंप', bg: '#f2c21a', fg: '#12305c', mark: '' },
+  cinema: { mr: 'चित्रपटगृह', bg: '#1b1b1b', fg: '#ffcf4a', mark: '' },
+  theatre: { mr: 'नाट्यगृह', bg: '#3a2a6a', fg: '#fff3c4', mark: '' },
+  mall: { mr: 'मॉल', bg: '#14181c', fg: '#ffd24a', mark: '' },
+  supermarket: { mr: 'सुपर मार्केट', bg: '#0b6b3a', fg: '#ffffff', mark: '' },
+  bakery: { mr: 'बेकरी', bg: '#7a3b1c', fg: '#ffe9c2', mark: '' },
+  medical_supply: { mr: 'मेडिकल', bg: '#12613a', fg: '#ffffff', mark: '✚ ' },
+  hardware: { mr: 'हार्डवेअर', bg: '#1b5e20', fg: '#fff59d', mark: '' },
+  motorcycle: { mr: 'शोरूम', bg: '#b3261e', fg: '#ffffff', mark: '' },
+  educational_institution: { mr: 'क्लासेस', bg: '#fdd835', fg: '#1a237e', mark: '' },
+  yes: { mr: 'दुकान', bg: '#1f5ba8', fg: '#ffffff', mark: '' },
+};
+
+/** Messages for the big roadside hoardings. */
+export const HOARDINGS = [
+  { top: 'स्वच्छ पनवेल, सुंदर पनवेल', sub: 'पनवेल महानगरपालिका', bg: '#0f6b53', fg: '#ffffff' },
+  { top: 'हेल्मेट घाला, सुरक्षित रहा', sub: 'वाहतूक शाखा', bg: '#f2c21a', fg: '#1b1b1b' },
+  { top: 'पाणी वाचवा, जीवन वाचवा', sub: 'SAVE WATER', bg: '#1f5ba8', fg: '#ffffff' },
+  { top: '1 & 2 BHK · AIRPORT TOUCH', sub: 'बुकिंग सुरू · SAMPLE FLAT READY', bg: '#7a1f3a', fg: '#ffe2a8' },
+  { top: 'गणेशोत्सवाच्या हार्दिक शुभेच्छा', sub: 'समस्त पनवेलकर', bg: '#e8731a', fg: '#fffbe6' },
+  { top: 'झाडे लावा, झाडे जगवा', sub: 'हरित पनवेल', bg: '#2f7d32', fg: '#ffffff' },
+  { top: 'सुरक्षित वाहन चालवा', sub: 'घरी कुणीतरी वाट पाहतंय', bg: '#14181c', fg: '#ffcf4a' },
+  { top: 'मतदान करा, लोकशाही बळकट करा', sub: 'YOUR VOTE COUNTS', bg: '#f7f7f2', fg: '#12305c' },
+];

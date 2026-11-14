@@ -8,7 +8,8 @@ import * as M from '../world/models.js';
 import { along } from '../world/geom.js';
 import { clamp, angDiff, mulberry32, hashStr } from '../util.js';
 
-const WALK = 5.2, RUN = 9.6;
+// A brisk walk and an easy jog: real paces, so streets feel their real length.
+const WALK = 2.9, RUN = 6.8;
 
 // ---- player ---------------------------------------------------------------------
 
@@ -152,16 +153,45 @@ export class CameraRig {
     this.cur = 7.5;
     this.target = new THREE.Vector3();
     this.idle = 0;
+    this.fp = true; // first person: see Panvel through your own eyes
+    this.eye = 0;
+  }
+  setFirstPerson(on) {
+    this.fp = on;
+    this.pitch = on ? 0.02 : 0.28;
+    this.camera.fov = on ? 68 : 56;
+    this.camera.updateProjectionMatrix();
   }
   snap(player) {
     this.target.set(player.pos.x, player.y + 1.45, player.pos.z);
     this.cur = this.dist;
+    this.eye = player.y + 1.6;
   }
   update(dt, look, turn, player, world) {
     if (look.x || look.y) this.idle = 0;
     else this.idle += dt;
-    this.yaw -= look.x * 0.0046 + turn * 1.9 * dt;
-    this.pitch = clamp(this.pitch + look.y * 0.0036, -0.12, 1.3);
+    const fp = this.fp && player.mode !== 'drive';
+    this.yaw -= look.x * (fp ? 0.0028 : 0.0046) + turn * 1.9 * dt;
+    this.pitch = clamp(this.pitch + look.y * (fp ? 0.0026 : 0.0036), fp ? -1.25 : -0.12, 1.3);
+    const c = this.camera;
+    const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
+
+    if (fp) {
+      // eyes: head height, with the small rise and sway of each step
+      const h = player.person.height;
+      const base = player.y + (player.mode === 'sit' ? h * 0.68 : h * 0.94);
+      const stride = Math.min(1, player.speed / 3);
+      const bob = Math.sin(player.person.phase * 2) * 0.03 * stride;
+      const sway = Math.cos(player.person.phase) * 0.022 * stride;
+      this.eye += (base - this.eye) * (1 - Math.exp(-dt * 14));
+      const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw), rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw);
+      c.position.set(player.pos.x + rx * sway + fx * 0.08, this.eye + bob, player.pos.z + rz * sway + fz * 0.08);
+      this.target.set(c.position.x + fx * cp, c.position.y - sp, c.position.z + fz * cp);
+      c.lookAt(this.target);
+      player.person.root.visible = false;
+      return;
+    }
+
     if (look.zoom) this.dist = clamp(this.dist * Math.pow(1.14, look.zoom), 2.4, 46);
     // swing in behind the rickshaw while driving, unless the player is looking around
     if (player.mode === 'drive' && this.idle > 0.8 && Math.abs(player.vehicle.speed) > 1.5) {
@@ -174,17 +204,17 @@ export class CameraRig {
     this.target.x += (player.pos.x - this.target.x) * k;
     this.target.y += (ty - this.target.y) * k;
     this.target.z += (player.pos.z - this.target.z) * k;
-    const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
-    const dx = Math.sin(this.yaw) * cp, dz = Math.cos(this.yaw) * cp;
+    const tp = this.fp ? Math.max(0.22, this.pitch) : this.pitch;
+    const cq = Math.cos(tp), sq = Math.sin(tp);
+    const dx = Math.sin(this.yaw) * cq, dz = Math.cos(this.yaw) * cq;
     let want = this.dist * (player.mode === 'drive' ? 1.25 : 1);
     // keep walls from coming between you and the camera
-    if (this.target.y + sp * want < 13) {
+    if (this.target.y + sq * want < 13) {
       const t = world.walls.cast(this.target.x, this.target.z, this.target.x + dx * want, this.target.z + dz * want);
       if (t < 1) want = Math.max(1.1, want * t - 0.4);
     }
     this.cur += (want - this.cur) * (want < this.cur ? 1 - Math.exp(-dt * 30) : 1 - Math.exp(-dt * 4));
-    const c = this.camera;
-    c.position.set(this.target.x + dx * this.cur, Math.max(0.35, this.target.y + sp * this.cur), this.target.z + dz * this.cur);
+    c.position.set(this.target.x + dx * this.cur, Math.max(0.35, this.target.y + sq * this.cur), this.target.z + dz * this.cur);
     c.lookAt(this.target);
     player.person.root.visible = this.cur > 1.9;
   }
@@ -335,17 +365,17 @@ export class Crowd {
         w.s = clamp(w.s, 0, w.r.len);
       }
       const a = along(w.r.pts, w.s);
-      const off = (w.r.w / 2 + 0.7) * w.side;
+      const off = (w.r.w / 2 + ('PSE'.includes(w.r.c) ? 1.3 : 0.6)) * w.side;
       const x = a.x + a.dz * off, z = a.z - a.dx * off;
       const d = Math.hypot(x - px, z - pz);
-      if (d > 165) {
+      if (d > 130) {
         w.active = false;
         w.person.root.visible = false;
         continue;
       }
       const yaw = Math.atan2(a.dx * w.dir, a.dz * w.dir);
       const root = w.person.root;
-      root.position.set(x, 0, z);
+      root.position.set(x, 'PSE'.includes(w.r.c) ? 0.15 : 0, z);
       root.rotation.y += angDiff(root.rotation.y, yaw) * (1 - Math.exp(-dt * 6));
       w.person.update(dt, w.v, 'stand');
     }
@@ -366,19 +396,20 @@ export class Traffic {
     this.world = world;
     this.rnd = mulberry32(4711);
     this.list = [];
-    const kinds = ['auto', 'auto', 'car', 'car', 'auto', 'tempo', 'car', 'bus', 'auto', 'car', 'suv', 'auto', 'tempo', 'car', 'bus', 'auto'];
+    const kinds = ['auto', 'scooter', 'car', 'scooter', 'auto', 'tempo', 'car', 'bus', 'scooter', 'auto', 'suv', 'scooter', 'car', 'auto', 'scooter', 'tempo', 'bus', 'scooter', 'auto', 'car', 'scooter', 'auto'];
     for (let i = 0; i < count; i++) {
       const kind = kinds[i % kinds.length];
       const group = buildModel(lib, (m) => {
         if (kind === 'auto') M.auto(m);
+        else if (kind === 'scooter') M.scooter(m, this.rnd, true);
         else if (kind === 'tempo') M.tempo(m, this.rnd);
         else if (kind === 'bus') M.bus(m, 'st');
         else M.car(m, this.rnd, kind === 'suv' ? 'suv' : undefined);
       });
       group.visible = false;
       scene.add(group);
-      const radius = kind === 'bus' ? 2.6 : kind === 'auto' ? 1.2 : 1.5;
-      this.list.push({ group, kind, active: false, r: null, s: 0, dir: 1, v: 0, top: kind === 'bus' ? 8 : 7 + this.rnd() * 5, wait: this.rnd() * 4, x: 0, z: 0, yaw: 0, radius });
+      const radius = kind === 'bus' ? 2.6 : kind === 'scooter' ? 0.7 : kind === 'auto' ? 1.2 : 1.5;
+      this.list.push({ group, kind, active: false, r: null, s: 0, dir: 1, v: 0, top: kind === 'bus' ? 8 : kind === 'scooter' ? 8 + this.rnd() * 5 : 7 + this.rnd() * 5, wait: this.rnd() * 4, x: 0, z: 0, yaw: 0, radius });
     }
   }
   ok(r, kind) {
@@ -430,7 +461,7 @@ export class Traffic {
       }
       const a = along(v.r.pts, v.s);
       // India drives on the left
-      const lane = Math.min(v.r.w / 4, 2.4);
+      const lane = Math.min(v.r.w / 4, 2.4) + (v.kind === 'scooter' ? 0.9 : 0);
       const ddx = a.dx * v.dir, ddz = a.dz * v.dir;
       v.x = a.x + ddz * lane;
       v.z = a.z - ddx * lane;

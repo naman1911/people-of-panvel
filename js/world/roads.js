@@ -125,10 +125,8 @@ export function buildRoads(m, data, ctx) {
     } else {
       jfoot[r.a] = jfoot[r.b] = 1;
     }
-    if ('PSE'.includes(r.c) || (r.c === 'R' && ctx.inTown(r.pts[0][0], r.pts[0][1]))) {
-      const pad = 'PS'.includes(r.c) ? 3.4 : r.c === 'E' ? 2.6 : 1.3;
-      strip(m, r.pts, r.w + pad * 2, Y_WALK, r.c === 'R' ? 'concrete' : 'paver', r.c === 'R' ? conc : paver);
-    }
+    if (r.c === 'R' && ctx.inTown(r.pts[0][0], r.pts[0][1])) strip(m, r.pts, r.w + 2.6, Y_WALK, 'concrete', conc);
+    else if ('PSE'.includes(r.c)) strip(m, r.pts, r.w + ('PS'.includes(r.c) ? 6.8 : 5.2), Y_WALK, 'paver', paver);
   }
   // Pass 2: carriageways.
   for (const r of roads) {
@@ -155,6 +153,41 @@ export function buildRoads(m, data, ctx) {
       strip(m, r.pts, r.w, Y_ROAD, 'paver', paver);
     }
   }
+  // Raised footpaths with painted kerbs, and zebra crossings, on the main streets.
+  const black = m.rgb('#2a2a2a'), kerbYellow = m.rgb('#d9a520'), kerbGrey = m.rgb('#b9b4a8');
+  for (const r of roads) {
+    if (r.tu || r.h || r.br || !'PSE'.includes(r.c) || !ctx.inTown(r.pts[0][0], r.pts[0][1])) continue;
+    const ta = (jdeg[r.a] > 2 ? jw[r.a] / 2 + 1.4 : 0.2), tb = (jdeg[r.b] > 2 ? jw[r.b] / 2 + 1.4 : 0.2);
+    if (r.len < ta + tb + 5) continue;
+    const striped = 'PS'.includes(r.c);
+    const sub = slice(r.pts, ta, r.len - tb, striped ? 1.7 : 12);
+    const pad = striped ? 3.2 : 2.4, KH = 0.15;
+    const inner = ribbon(sub, r.w), outer = ribbon(sub, r.w + pad * 2);
+    for (let i = 1; i < sub.length; i++) {
+      m.chunk(sub[i][0], sub[i][1]);
+      for (const [a, b, side] of [[inner.L, outer.L, 1], [inner.R, outer.R, -1]]) {
+        // footpath surface
+        m.quadUp([a[i - 1][0], KH, a[i - 1][1]], [b[i - 1][0], KH, b[i - 1][1]], [b[i][0], KH, b[i][1]], [a[i][0], KH, a[i][1]], null, null, null, null, paver, 'paver');
+        // kerb face towards the carriageway
+        const col = striped ? (i % 2 ? kerbYellow : black) : kerbGrey;
+        const A = [a[i - 1][0], 0.04, a[i - 1][1]], B = [a[i][0], 0.04, a[i][1]], C = [a[i][0], KH, a[i][1]], D = [a[i - 1][0], KH, a[i - 1][1]];
+        if (side > 0) m.quad(B, A, D, C, null, null, null, null, col, 'flat');
+        else m.quad(A, B, C, D, null, null, null, null, col, 'flat');
+      }
+    }
+    // zebra crossings where this street meets a junction
+    if (r.len > 40) {
+      for (const [deg, d0] of [[jdeg[r.a], ta + 1.2], [jdeg[r.b], r.len - tb - 4.2]]) {
+        if (deg < 3) continue;
+        const a = along(r.pts, d0), b = along(r.pts, d0 + 3);
+        const nx = a.dz, nz = -a.dx;
+        m.chunk(a.x, a.z);
+        for (let k = -r.w / 2 + 0.5; k < r.w / 2 - 0.4; k += 1.1) {
+          m.quadUp([a.x + nx * k, Y_MARK, a.z + nz * k], [a.x + nx * (k + 0.55), Y_MARK, a.z + nz * (k + 0.55)], [b.x + nx * (k + 0.55), Y_MARK, b.z + nz * (k + 0.55)], [b.x + nx * k, Y_MARK, b.z + nz * k], null, null, null, null, white, 'mark');
+        }
+      }
+    }
+  }
   // Rounded joins where streets meet.
   for (let j = 0; j < junc.length; j++) {
     if (jw[j] > 0 && jdeg[j] !== 2) {
@@ -163,6 +196,17 @@ export function buildRoads(m, data, ctx) {
     }
   }
   return { junc };
+}
+
+/** The part of a polyline between distances s0 and s1, resampled every `step` metres. */
+function slice(pts, s0, s1, step) {
+  const out = [];
+  const n = Math.max(1, Math.round((s1 - s0) / step));
+  for (let i = 0; i <= n; i++) {
+    const a = along(pts, s0 + ((s1 - s0) * i) / n);
+    out.push([a.x, a.z]);
+  }
+  return out;
 }
 
 /** Flat ribbon along a polyline. */

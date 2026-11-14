@@ -15,6 +15,9 @@ export class Input {
     this.dragging = false;
     this.touchLook = null;
     this.touchMove = null;
+    this.locked = false;
+    this.wantLock = null; // () => boolean
+    this.onLock = null;
 
     window.addEventListener('keydown', (e) => {
       const tag = (e.target && e.target.tagName) || '';
@@ -38,8 +41,19 @@ export class Input {
       this.lastX = e.clientX;
       this.lastY = e.clientY;
       canvas.focus();
+      // In first person a click captures the mouse, so you look around just by moving it.
+      if (this.wantLock?.() && document.pointerLockElement !== canvas) canvas.requestPointerLock?.()?.catch?.(() => {});
+    });
+    document.addEventListener('pointerlockchange', () => {
+      this.locked = document.pointerLockElement === canvas;
+      this.onLock?.(this.locked);
     });
     window.addEventListener('mousemove', (e) => {
+      if (this.locked) {
+        this.lookX += e.movementX || 0;
+        this.lookY += e.movementY || 0;
+        return;
+      }
       if (!this.dragging) return;
       this.lookX += e.clientX - this.lastX;
       this.lookY += e.clientY - this.lastY;
@@ -119,6 +133,10 @@ export class Input {
   turn() {
     if (!this.enabled) return 0;
     return (this.keys.has('ArrowRight') ? 1 : 0) - (this.keys.has('ArrowLeft') ? 1 : 0);
+  }
+
+  unlock() {
+    if (document.pointerLockElement === this.canvas) document.exitPointerLock?.();
   }
 
   consumeLook() {

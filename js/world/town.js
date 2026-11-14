@@ -59,6 +59,7 @@ export function buildTown(data, lib, tier, hooks = {}) {
   const greens = new PolyGrid(60);
   for (const g of data.land) {
     const p = unpack(g.p);
+    g.pts = p;
     m.chunk(...centroid(p));
     if (g.k === 'y') m.poly(p, 0.015, '#f0ece4', 'concrete');
     else if (g.k === 'k') m.poly(p, 0.015, '#dcd8d0', 'concrete');
@@ -79,6 +80,7 @@ export function buildTown(data, lib, tier, hooks = {}) {
   const unpackCache = new Map();
   for (const w of data.water) {
     const p = unpack(w.p);
+    w.pts = p;
     unpackCache.set(w, p);
     const area = Math.abs(polyArea(p));
     waterPolys.push(p);

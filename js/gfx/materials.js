@@ -91,8 +91,8 @@ export function buildMaterials(quality) {
     emissiveIntensity: 0,
     roughness: 0.8,
   });
-  lib.shop.userData.nightGain = 2.6;
-  lib.shop.userData.dayGlow = 0.12;
+  lib.shop.userData.nightGain = 1.15;
+  lib.shop.userData.dayGlow = 0.1;
   nightList.push(lib.shop);
 
   // Untextured, vertex-coloured: vehicles, furniture, metalwork, painted things.

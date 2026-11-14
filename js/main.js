@@ -12,6 +12,7 @@ import { buildTown } from './world/town.js';
 import { createWater } from './world/water.js';
 import { furnish } from './world/props.js';
 import { special, placeSetpieces } from './world/setpieces.js';
+import { placeNames } from './world/naming.js';
 import { signGroup, setSignNight } from './world/signs.js';
 import { World } from './world/world.js';
 import * as M from './world/models.js';
@@ -20,6 +21,9 @@ import { Player, CameraRig, Residents, Crowd, Traffic, Rickshaws, Strays, buildM
 import { PEOPLE, POSTERS } from './data/people.js';
 import { HUBS, STAMPS, SPAWN, TITLE_SHOT, zoneAt } from './data/places.js';
 import { createUI } from './ui.js';
+import { createMap } from './minimap.js';
+import { STREET_MR } from './data/streets.js';
+import { isTouch } from './util.js';
 import { sfx } from './sfx.js';
 
 const canvas = document.getElementById('city');
@@ -51,6 +55,7 @@ async function start() {
     furnish(m, env) {
       furnish(m, env);
       placeSetpieces(m, env);
+      placeNames(m, env);
     },
   });
   scene.add(town.group, signGroup);
@@ -75,8 +80,8 @@ async function start() {
   const rig = new CameraRig(camera);
   const residents = new Residents(scene, world, PEOPLE);
   const light = R.tier.name === 'low';
-  const crowd = new Crowd(scene, world, light ? 10 : 24);
-  const traffic = new Traffic(scene, world, lib, light ? 7 : 16);
+  const crowd = new Crowd(scene, world, light ? 12 : 34);
+  const traffic = new Traffic(scene, world, lib, light ? 9 : 22);
   const rickshaws = new Rickshaws(scene, world, lib, spots.autos);
   const strays = new Strays(scene, world, lib, spots.hubs.map((s, i) => ({ x: s.x + 5 + i, z: s.z - 6 })));
 
@@ -172,8 +177,25 @@ async function start() {
   const me0 = store.get('me');
   if (me0) player.setLook(me0.look);
 
+  const reticle = h('div.reticle', { hidden: true });
+  document.body.append(reticle);
+  rig.setFirstPerson((params.get('view') || store.get('view')) !== 'tp');
+
   const game = {
     input, atmo, residents, player, strays, store,
+    map: createMap(data),
+    streetMr: (n) => STREET_MR[n],
+    firstPerson: () => rig.fp,
+    toggleView() {
+      rig.setFirstPerson(!rig.fp);
+      store.set('view', rig.fp ? 'fp' : 'tp');
+      if (!rig.fp) input.unlock();
+      rig.snap(player);
+      ui.redrawHud();
+    },
+    // map arrow: clockwise from north
+    heading: () => -rig.yaw,
+    guide: () => guide,
     say: (n) => residents.speak(n, time, getLang()),
     mission(id) {
       if (store.add('done', id)) sfx.pop();
@@ -253,6 +275,7 @@ async function start() {
       location.reload();
     },
     onPanel(name, was) {
+      if (name) input.unlock();
       input.enabled = !name || name === 'profile' || name === 'chai' || name === 'katta';
       if (was === 'chai' && player.mode === 'sit') player.stand();
       if (was === 'me') {
@@ -262,6 +285,8 @@ async function start() {
     },
   };
   const ui = createUI(game);
+  input.wantLock = () => state === 'play' && rig.fp && !ui.panel;
+  const touchDevice = isTouch();
 
   // ---- what can be used right now -----------------------------------------------------
   let action = null;
@@ -290,8 +315,9 @@ async function start() {
     }
     if (code === 'Escape') return ui.panel ? ui.close() : game.guideTo(null);
     if (code === 'KeyE' || code === 'Enter') return action?.run();
-    const map = { KeyF: 'find', KeyT: 'travel', KeyB: 'darshan', KeyC: 'katta', KeyM: 'me', KeyH: 'help', Slash: 'help' };
+    const map = { KeyF: 'find', KeyT: 'travel', KeyB: 'darshan', KeyC: 'katta', KeyM: 'me', KeyH: 'help', Slash: 'help', KeyN: 'map', Tab: 'map' };
     if (map[code]) ui.toggle(map[code]);
+    if (code === 'KeyV') game.toggleView();
     if (code === 'KeyG' && player.mode === 'drive') sfx.horn();
   };
 
@@ -319,7 +345,7 @@ async function start() {
   const clock = new THREE.Clock();
   const focus = new THREE.Vector3();
   const maxFrames = parseInt(params.get('frames') || '0', 10);
-  let frames = 0, slow = 0, acc = 0, step = 0, degrade = 0, lampT = 0, readT = 0;
+  let frames = 0, slow = 0, acc = 0, step = 0, degrade = 0, lampT = 0, readT = 0, miniT = 0, lastStep = 0;
 
   function frame() {
     const dt = Math.min(0.05, clock.getDelta());
@@ -346,11 +372,29 @@ async function start() {
       if (ui.panelName === 'profile' && action?.id) action = null;
       ui.setPrompt(action ? action.text : '', () => action?.run());
 
+      // footsteps, in time with the stride
+      if (player.mode === 'walk' && player.speed > 0.6) {
+        const k = Math.floor(player.person.phase / Math.PI);
+        if (k !== lastStep) {
+          lastStep = k;
+          sfx.step(atmo.rain > 0.5);
+        }
+      }
+      const fpNow = rig.fp && player.mode !== 'drive';
+      reticle.hidden = !fpNow || !!ui.panel;
+      ui.setLookHint(fpNow && !input.locked && !touchDevice && !ui.panel);
+      miniT += dt;
+      if (miniT > 0.1) {
+        miniT = 0;
+        ui.drawMini(player.pos.x, player.pos.z, -rig.yaw, guide);
+      }
+
       step += dt;
       if (step > 0.25) {
         step = 0;
         const px = player.pos.x, pz = player.pos.z;
         ui.setZone(zoneAt(px, pz));
+        ui.setStreet(world.streetNameAt(px, pz) || '');
         for (const s of STAMPS) {
           if (Math.hypot(s.x - px, s.z - pz) < s.r && store.add('stamps', s.id)) {
             ui.toast(t('stamp_toast', { name: L(s) }), 'good');
@@ -369,6 +413,17 @@ async function start() {
         readT = 0;
         ui.tick();
         sfx.rain(atmo.rain);
+        const px = player.pos.x, pz = player.pos.z;
+        let near = 0;
+        for (const v of traffic.list) if (v.active && Math.hypot(v.x - px, v.z - pz) < 80) near++;
+        const zn = zoneAt(px, pz).id;
+        sfx.ambience({
+          bustle: clamp(near / 7 + (['bazaar', 'stand', 'junction', 'chowk'].includes(zn) ? 0.3 : 0.08), 0, 1) * (1 - atmo.night * 0.5),
+          night: atmo.night, rain: atmo.rain,
+          green: zn === 'talav' || !!town.greens.find(px, pz),
+          temple: Math.hypot(px + 473, pz + 205) < 80,
+          station: zn === 'junction',
+        });
       }
       if (guide) {
         if (guide.person) (guide.x = guide.person.x), (guide.z = guide.person.z);
@@ -430,7 +485,7 @@ async function start() {
   }
   frame();
   window.__pop = { scene, camera, R, atmo, town, lib, world, player, rig, residents, game, ui, rickshaws, spots };
-  void clamp; void mulberry32; void h;
+  void mulberry32;
 }
 
 start().catch((e) => {

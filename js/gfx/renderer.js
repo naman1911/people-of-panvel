@@ -21,6 +21,16 @@ export function pickTier() {
   const mem = navigator.deviceMemory || 4;
   if (coarse) return cores >= 8 && mem >= 6 ? 'medium' : 'low';
   if (cores <= 4 || mem < 4) return 'medium';
+  // Integrated and software GPUs get the lighter tier; the full effects need a real graphics card.
+  try {
+    const gl = document.createElement('canvas').getContext('webgl2');
+    const ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
+    const name = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : '';
+    if (/SwiftShader|llvmpipe|Software|Basic Render/i.test(name)) return 'low';
+    if (/Intel|UHD|Iris|Mali|Adreno|PowerVR|Radeon\(TM\) Graphics|Vega/i.test(name) && !/Arc/i.test(name)) return 'medium';
+  } catch {
+    /* fall through */
+  }
   return 'high';
 }
 
