@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8"><title>texture preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Mukta:wght@400;600;700&display=swap" rel="stylesheet">
+<script type="importmap">{"imports":{"three":"../vendor/three.module.min.js"}}</script>
+<style>body{background:#222;color:#eee;font:12px sans-serif;margin:8px}canvas{width:256px;height:256px;margin:2px;image-rendering:auto}.big canvas{width:512px;height:512px}h3{margin:6px 0 2px}</style>
+<div id="out"></div>
+<script type="module">
+import * as SF from '../js/gfx/surfaces.js';
+import { FACADES, shopAtlas } from '../js/gfx/facades.js';
+const out = document.getElementById('out');
+await Promise.all([document.fonts.load('800 40px "Baloo 2"', 'पनवेल ABC'), document.fonts.load('700 20px "Baloo 2"', 'पनवेल ABC')]).catch(() => {});
+const q = new URLSearchParams(location.search).get('set') || 'surf';
+const add = (title, cs, big) => { const d = document.createElement('div'); if (big) d.className = 'big'; d.innerHTML = `<h3>${title}</h3>`; for (const c of cs) if (c) d.append(c); out.append(d); };
+const t0 = performance.now();
+if (q === 'surf') for (const k of ['asphalt','pavers','concrete','earth','grass','plaster','terrace','clayTiles','tinSheet','ballast','stone','wood','leaves','bark']) { const r = SF[k](); add(k, [r.map, r.normalMap]); }
+if (q.startsWith('fac')) for (const k of q.slice(4).split(',')) { const r = FACADES[k](7); add(k, [r.map, r.emissiveMap, r.normalMap], true); }
+if (q === 'shop') { const r = shopAtlas(); add('shops', [r.map, r.emissiveMap], true); document.querySelectorAll('.big canvas').forEach(c => { c.style.width = '1024px'; c.style.height = '1024px'; }); }
+document.title = 'done ' + Math.round(performance.now() - t0) + 'ms';
+</script>
