@@ -4,12 +4,22 @@ Walk through a 3D Panvel built from the town's real streets and buildings, and m
 
 It runs entirely in the browser. There is no build step, no server and no account.
 
+![Title screen: Vadale Talav at dusk](docs/title.jpg)
+
+| | |
+| --- | --- |
+| ![Street view at Shivaji Chowk](docs/street.jpg) | ![Vadale Talav](docs/lake.jpg) |
+| ![Night](docs/night.jpg) | ![Monsoon](docs/monsoon.jpg) |
+
+![The map, with real street names](docs/map.jpg)
+
 ## What's in it
 
 - **The real town.** About 4,600 building footprints, the full street network, Vadale Talav and the other lakes, the river, the flyover, the rail lines and the platforms of Panvel Junction, all taken from OpenStreetMap and placed where they really are.
 - **Real names.** Street nameboards, signboards on hospitals, banks, schools and shops that the map records, housing-society name plates, and a live map with street names.
 - **Walking pace.** First-person view by default, at a real walking speed, with footsteps and street sound. Press `V` for a view from behind.
 - **People.** 26 residents with profiles in English and Marathi. They are fictional (see below).
+- **A town that moves.** Traffic keeps left, scooters weave, a local pulls in and out of Panvel Junction, evening walkers circle the lake, and cows rest where they please.
 - **Things to do.** Collect Panvel Darshan stamps at 16 landmarks, drive a rickshaw, sit for a cutting chai, read and pin notices, take a stray along, and hop between neighbourhoods by share rickshaw.
 - **Weather and time.** The sun follows the real solar path for Panvel at the current time in India. The monsoon months bring rain, wet streets and low cloud. Both can be changed from the HUD.
 

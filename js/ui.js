@@ -174,7 +174,7 @@ export function createUI(game) {
     if (text === promptText) return;
     promptText = text;
     promptBtn.hidden = !text;
-    if (text) promptBtn.replaceChildren(touch ? null : h('kbd', 'E'), text);
+    if (text) promptBtn.replaceChildren(...(touch ? [text] : [h('kbd', 'E'), text]));
   };
 
   // guide chip
@@ -262,6 +262,7 @@ export function createUI(game) {
     if (!ui.panel) return;
     ui.panel.remove();
     ui.panel = null;
+    hud.classList.remove('has-panel');
     const was = ui.panelName;
     ui.panelName = null;
     game.onPanel?.(null, was);
@@ -271,6 +272,7 @@ export function createUI(game) {
     ui.panel = h('div.panel.panel--' + side.split(' ').join('.panel--'), { role: 'dialog' }, ...kids);
     ui.panelName = name;
     root.append(ui.panel);
+    hud.classList.add('has-panel');
     game.onPanel?.(name);
     return ui.panel;
   }

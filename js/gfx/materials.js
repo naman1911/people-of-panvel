@@ -121,10 +121,11 @@ export function buildMaterials(quality) {
     lib.glow.color.setScalar(0.35 + night * 1.4);
     for (const m of wetList) {
       const base = m.userData.baseRough;
-      m.roughness = base - wet * (base - 0.22);
-      const k = 1 - wet * 0.32;
-      m.color.setRGB(k, k, k * 1.02);
-      m.envMapIntensity = 1 + wet * 1.2;
+      // wet ground is darker and shinier, but still ground rather than a mirror
+      m.roughness = base - wet * (base - 0.34);
+      const k = 1 - wet * 0.45;
+      m.color.setRGB(k, k, k * 1.03);
+      m.envMapIntensity = 1 + wet * 0.35;
     }
   };
 

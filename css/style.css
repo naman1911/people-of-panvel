@@ -204,12 +204,15 @@ button.item:hover{border-color:rgba(255,182,39,.55);background:rgba(255,182,39,.
 @media (max-width:1100px){.hud-center{max-width:min(520px,calc(100vw - 380px))}.hud-keys{display:none}.minimap{bottom:calc(14px + var(--safe-b))}}
 @media (max-width:760px){
   body{font-size:14px}
-  .minimap{width:96px;height:96px;left:calc(10px + var(--safe-l));bottom:auto;top:calc(58px + var(--safe-t))}
+  .minimap{width:100px;height:100px;left:calc(10px + var(--safe-l));bottom:calc(12px + var(--safe-b))}
+  .guestbar{display:none}
+  .hud-dock{max-width:calc(100vw - 130px)}
   .board{padding:5px 12px 3px;min-width:0}.board-mr{font-size:19px}.board-en{font-size:11px;letter-spacing:1.6px}.board-area{display:none}
-  .hud-center{top:calc(64px + var(--safe-t));max-width:calc(100vw - 24px);width:calc(100vw - 24px)}
+  .hud-center{top:calc(150px + var(--safe-t));max-width:calc(100vw - 24px);width:calc(100vw - 24px)}
+  .hud.has-panel>*{display:none}
   .guestbar{width:100%;justify-content:space-between}
   .chip{padding:8px 10px 6px}.chip .lbl,.chip kbd,.btn kbd,.esc kbd{display:none}
-  .hud-right{gap:6px}.hud-dock{max-width:calc(100vw - 150px)}
+  .hud-right{gap:6px}
   .panel,.panel--left,.panel--right,.panel--center{left:8px;right:8px;width:auto;top:calc(56px + var(--safe-t));bottom:calc(8px + var(--safe-b));max-height:none;transform:none}
   .panel-title{font-size:25px}
   .prompt{bottom:calc(24vh + var(--safe-b))}
@@ -226,7 +229,13 @@ button.item:hover{border-color:rgba(255,182,39,.55);background:rgba(255,182,39,.
   .intro-sub,.credit{display:none}
   .intro-meta{margin:6px 0 10px}
   .intro .btn{font-size:18px;padding:9px 20px 7px}
-  .minimap{width:104px;height:104px}
+  .minimap{width:104px;height:104px;bottom:calc(12px + var(--safe-b))}
+  .hud.has-panel>*{display:none}
+  .guestbar{display:none}
+  .chip{padding:8px 10px 6px}.chip .lbl,.chip kbd,.btn kbd{display:none}
+  .hud-keys{display:none}
+  .prompt{bottom:calc(30vh + var(--safe-b))}
+  .lookhint{display:none}
   .panel,.panel--left,.panel--right,.panel--center{top:calc(8px + var(--safe-t));bottom:calc(8px + var(--safe-b));max-height:none}
   .panel--center{transform:translateX(-50%)}
 }
