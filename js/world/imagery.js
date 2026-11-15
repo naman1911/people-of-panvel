@@ -87,14 +87,32 @@ export function createImagery(cfg, tier, meta, lib, override) {
         tx: tx0 + cx, ty: ty0 + cy, aw, ah,
         x0: xOfTile(tx0 + cx), x1: xOfTile(tx0 + cx + aw), z0: zOfTile(ty0 + cy), z1: zOfTile(ty0 + cy + ah),
       };
-      // Satellite pixels are half a metre wide. Up close, a fine grain keeps the ground from looking smeared.
+      // From above, the photo is shown as it is. Standing on it is another matter: each pixel is
+      // half a metre of flattened treetop and shadow. So near a walker the ground eases to the
+      // photo's own colours, blurred and lifted out of the shadows, with a fine grain on top.
+      // It is still the real place, without the smears. Rooftops always keep the photo.
       const reps = (a.x1 - a.x0) / 2.2;
       mat.onBeforeCompile = (shader) => {
         shader.uniforms.uDetail = { value: detail };
         shader.uniforms.uReps = { value: reps };
+        shader.uniforms.uLod = { value: Math.max(2, z - 13) }; // a blur of roughly 18 m
+        shader.vertexShader = shader.vertexShader
+          .replace('#include <common>', '#include <common>\nvarying vec3 vSatWorld;')
+          .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vSatWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
         shader.fragmentShader = shader.fragmentShader
-          .replace('#include <map_pars_fragment>', '#include <map_pars_fragment>\nuniform sampler2D uDetail;\nuniform float uReps;')
-          .replace('#include <map_fragment>', '#include <map_fragment>\n#ifdef USE_MAP\n  diffuseColor.rgb *= 0.78 + 0.44 * texture2D(uDetail, vMapUv * uReps).g;\n#endif');
+          .replace('#include <map_pars_fragment>', '#include <map_pars_fragment>\nuniform sampler2D uDetail;\nuniform float uReps;\nuniform float uLod;\nvarying vec3 vSatWorld;')
+          .replace('#include <map_fragment>', `#include <map_fragment>
+#ifdef USE_MAP
+  float satPhoto = 1.0;
+  if (vSatWorld.y < 1.0) {
+    satPhoto = max(smoothstep(22.0, 75.0, cameraPosition.y), smoothstep(90.0, 260.0, distance(cameraPosition, vSatWorld)));
+    vec3 satAvg = textureLod(map, vMapUv, uLod).rgb;
+    float satLum = dot(satAvg, vec3(0.2126, 0.7152, 0.0722));
+    vec3 satSoft = satAvg * (clamp(satLum, 0.15, 0.42) / max(satLum, 0.02));
+    diffuseColor.rgb = mix(satSoft, diffuseColor.rgb, satPhoto);
+  }
+  diffuseColor.rgb *= 0.78 + 0.44 * texture2D(uDetail, vMapUv * uReps).g;
+#endif`);
       };
       lib['sat' + a.i] = mat;
       atlases.push(a);

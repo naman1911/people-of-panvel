@@ -765,7 +765,7 @@ async function start() {
       cullT = 0.3;
       const range = R.tier.detailRange + Math.max(0, camera.position.y - 20) * 3;
       // From high up, with photos on the ground, the drawn road surface gives way to the real one in the photo.
-      const high = imagery.enabled && camera.position.y > 70;
+      const high = imagery.enabled && camera.position.y > 60;
       for (const ch of chunks) {
         const show = Math.hypot(ch.c.userData.cx - camera.position.x, ch.c.userData.cz - camera.position.z) < range + 170;
         if (show !== ch.shown || high !== wasHigh) {

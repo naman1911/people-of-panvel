@@ -110,6 +110,8 @@ export function buildRoads(m, data, ctx) {
   const jdeg = new Uint8Array(junc.length);
 
   const Y_WALK = 0.03, Y_ROAD = 0.05, Y_MARK = 0.06;
+  // With photos on the ground, every flat drawn surface must be in a layer that can be switched off from high up.
+  const flatLayer = ctx.imagery ? 'paver' : 'concrete';
   const white = m.rgb('#e9e6dc'), yellow = m.rgb('#d9a520');
   const asph = m.rgb('#ffffff'), asphOld = m.rgb('#e2ddd6'), paver = m.rgb('#ffffff'), conc = m.rgb('#e8e4dc');
 
@@ -125,7 +127,7 @@ export function buildRoads(m, data, ctx) {
     } else {
       jfoot[r.a] = jfoot[r.b] = 1;
     }
-    if (r.c === 'R' && ctx.inTown(r.pts[0][0], r.pts[0][1])) strip(m, r.pts, r.w + 2.6, Y_WALK, 'concrete', conc);
+    if (r.c === 'R' && ctx.inTown(r.pts[0][0], r.pts[0][1])) strip(m, r.pts, r.w + 2.6, Y_WALK, flatLayer, conc);
     else if ('PSE'.includes(r.c)) strip(m, r.pts, r.w + ('PS'.includes(r.c) ? 6.8 : 5.2), Y_WALK, 'paver', paver);
   }
   // Pass 2: carriageways.
@@ -148,7 +150,7 @@ export function buildRoads(m, data, ctx) {
         }
       }
     } else if (r.c === 'X') {
-      strip(m, r.pts, r.w, Y_ROAD, 'concrete', conc);
+      strip(m, r.pts, r.w, Y_ROAD, flatLayer, conc);
     } else {
       strip(m, r.pts, r.w, Y_ROAD, 'paver', paver);
     }
