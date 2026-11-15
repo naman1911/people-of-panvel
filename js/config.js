@@ -15,7 +15,7 @@ export const CONFIG = {
    * With no key, the town uses its drawn ground and roof textures.
    */
   imagery: {
-    key: '',
+    key: 'AAPTaXpoEVB0ddz_OVbqjUtpAtQ..kGOk9lpqPpytr4I3SFhPVNJNmwyW2B8oq9zpwqwRiVxEdpun2mQJ1UydTMYldBeHXa-1cESr_b5sAXShVIErK-TOpZwnzazuYpa064wysCrpYrsAld-gO9G3x4P9RWIZt3OTUMao8lk5RMrbYzvfc6fe0AinHeKDZ_66R4t-VkvVCFWRbLVecZ5-IdWcHzp43PU6Kv3LaddlgVdorXaw9zRQPvhAskCiqfoA9oHK9JJW0hvWfGyOGRCKAT1_6hYBMapa',
     // {z} {x} {y} are the usual web-map tile numbers; {key} is the key above.
     url: 'https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token={key}',
     attribution: 'Imagery © Esri, Maxar, Earthstar Geographics · Powered by Esri',
