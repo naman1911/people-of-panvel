@@ -15,6 +15,8 @@
 //   c/<cell>        things said out loud to people nearby
 //   c/town          the town-wide room
 //   d/<id>          private requests and encrypted private messages for <id>
+//   k/<group>       a katta circle: people sitting together at one stall or bench
+//   g/<game>        game results: race times, treasure hunt finishes
 //   x/<id>          last-will: published by the relay when <id> drops off
 
 import { Mqtt } from './mqtt.js';
@@ -27,6 +29,7 @@ const RELAYS = ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/
 const CELL = 300; // metres; you hear movement and speech from your cell and its neighbours
 const HEAR = 60; // metres: how far a spoken message carries
 const MAX_PEERS = 160;
+const GESTURES = new Set(['wave', 'namaskar', 'clap', 'dance', 'laugh', 'cheers']);
 
 const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
 const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
@@ -118,7 +121,8 @@ export class Live {
     this.mq = mq;
     this.attempt = 0;
     this.relay = url;
-    mq.subscribe([`${PREFIX}/b/+`, `${PREFIX}/x/+`, `${PREFIX}/c/town`, `${PREFIX}/d/${this.id}`]);
+    mq.subscribe([`${PREFIX}/b/+`, `${PREFIX}/x/+`, `${PREFIX}/c/town`, `${PREFIX}/d/${this.id}`, `${PREFIX}/g/+`]);
+    if (this.circle) mq.subscribe(`${PREFIX}/k/${this.circle}`);
     this.cells.clear();
     this._cells();
     this._state('on');
@@ -151,6 +155,7 @@ export class Live {
     }
     this._drop();
     this.links.clear();
+    this.circle = null;
     this._state('off');
   }
 
@@ -180,7 +185,7 @@ export class Live {
   }
 
   /** Call every frame with where the player is and how they stand. */
-  update(dt, x, z, yaw, speed, mode) {
+  update(dt, x, z, yaw, speed, mode, ref) {
     this.pos.x = x;
     this.pos.z = z;
     if (!this.online) return;
@@ -188,7 +193,7 @@ export class Live {
     const now = Date.now();
     const sinceMove = now - (this.moveAt || 0);
     if (sinceMove >= 200) {
-      const msg = `${Math.round(x * 10)},${Math.round(z * 10)},${Math.round(yaw * 100)},${Math.round(speed * 10)},${mode}`;
+      const msg = `${Math.round(x * 10)},${Math.round(z * 10)},${Math.round(yaw * 100)},${Math.round(speed * 10)},${mode}${mode === 3 && ref ? ',' + ref : ''}`;
       // moving: five times a second. standing still: a heartbeat every two seconds.
       if (msg !== this.lastSent || sinceMove >= 2000) {
         if (cellOf(x, z) !== this.cell) this._cells();
@@ -213,7 +218,7 @@ export class Live {
   }
 
   /** Say something. scope: 'near' (people around you) or 'town' (everyone online). */
-  say(text, scope = 'near') {
+  say(text, scope = 'near', pin) {
     if (!this.online) return false;
     const now = Date.now();
     if (now - this.lastSay < 1200) return false;
@@ -221,13 +226,58 @@ export class Live {
     if (!t) return false;
     this.lastSay = now;
     const topic = scope === 'town' ? 'c/town' : 'c/' + this.cell;
-    this.mq.publish(`${PREFIX}/${topic}`, JSON.stringify({ i: this.id, n: this.me.name, t, x: Math.round(this.pos.x), z: Math.round(this.pos.z) }));
+    const body = { i: this.id, n: this.me.name, t, x: Math.round(this.pos.x), z: Math.round(this.pos.z) };
+    if (pin) body.p = [Math.round(pin[0]), Math.round(pin[1])];
+    this.mq.publish(`${PREFIX}/${topic}`, JSON.stringify(body));
     return true;
   }
 
+  // ---- katta circles: people sitting together ----------------------------------------
+
+  joinCircle(group) {
+    if (!/^[a-z0-9_-]{1,24}$/.test(group)) return;
+    this.leaveCircle();
+    this.circle = group;
+    this.logs.katta = [];
+    if (this.online) this.mq.subscribe(`${PREFIX}/k/${group}`);
+  }
+
+  leaveCircle() {
+    if (!this.circle) return;
+    if (this.online) this.mq.unsubscribe(`${PREFIX}/k/${this.circle}`);
+    this.circle = null;
+  }
+
+  /** Say something to the people sitting with you. `gift` offers everyone a cutting chai. */
+  circleSay(text, gift) {
+    if (!this.online || !this.circle) return false;
+    const now = Date.now();
+    if (now - this.lastSay < 1000) return false;
+    const t = gift ? '' : cleanText(text, 200);
+    if (!gift && !t) return false;
+    this.lastSay = now;
+    this.mq.publish(`${PREFIX}/k/${this.circle}`, JSON.stringify(gift ? { i: this.id, n: this.me.name, e: 'chai' } : { i: this.id, n: this.me.name, t }));
+    return true;
+  }
+
+  // ---- games ----------------------------------------------------------------------------
+
+  /** Tell the town about a result: a race time (ms) or a finished treasure hunt. */
+  announce(game, data = {}) {
+    if (!this.online || !/^[a-z]{1,12}$/.test(game)) return;
+    this.mq.publish(`${PREFIX}/g/${game}`, JSON.stringify({ i: this.id, n: this.me.name, ...data }));
+  }
+
+  /** Show a gesture to people nearby. */
+  emote(kind) {
+    if (!this.online || !GESTURES.has(kind)) return;
+    const now = Date.now();
+    if (now - (this.lastEmote || 0) < 700) return;
+    this.lastEmote = now;
+    this.mq.publish(`${PREFIX}/c/${this.cell}`, JSON.stringify({ i: this.id, e: kind }));
+  }
   wave() {
-    if (!this.online) return;
-    this.mq.publish(`${PREFIX}/c/${this.cell}`, JSON.stringify({ i: this.id, n: this.me.name, w: 1, x: Math.round(this.pos.x), z: Math.round(this.pos.z) }));
+    this.emote('wave');
   }
 
   // ---- private chats ---------------------------------------------------------------------
@@ -316,6 +366,8 @@ export class Live {
       if (kind === 'x') return this._onGone(parts[2]);
       if (kind === 'c') return this._onSay(parts[2], JSON.parse(text));
       if (kind === 'd') return this._onDirect(JSON.parse(text));
+      if (kind === 'k') return this._onCircle(parts[2], JSON.parse(text));
+      if (kind === 'g') return this._onGame(parts[2], JSON.parse(text));
     } catch {
       /* malformed: ignore */
     }
@@ -331,7 +383,7 @@ export class Live {
     const fresh = !p;
     if (fresh) {
       if (this.peers.size >= MAX_PEERS) return;
-      p = { id, x: bx, z: bz, tx: bx, tz: bz, yaw: 0, tyaw: 0, v: 0, mode: 0, moved: 0, say: null, sayUntil: 0, wave: 0, lookRev: 0 };
+      p = { id, x: bx, z: bz, tx: bx, tz: bz, yaw: 0, tyaw: 0, v: 0, mode: 0, moved: 0, say: null, sayUntil: 0, gesture: null, gestureAt: 0, ref: null, lookRev: 0 };
       this.peers.set(id, p);
     }
     p.seen = Date.now();
@@ -363,7 +415,9 @@ export class Live {
     p.tz = finite(a[1], -30000, 30000) / 10;
     p.tyaw = finite(a[2], -100000, 100000) / 100;
     p.v = finite(a[3], 0, 250) / 10;
-    p.mode = finite(a[4], 0, 2) | 0;
+    p.mode = finite(a[4], 0, 3) | 0;
+    // passengers name the driver they are riding with
+    p.ref = p.mode === 3 && /^[a-z0-9]{13}$/.test(a[5] || '') ? a[5] : null;
     p.seen = p.moved = Date.now();
   }
 
@@ -380,7 +434,7 @@ export class Live {
     const id = String(d.i || '');
     if (id === this.id) {
       // our own words, echoed back by the relay: now we know they were sent
-      if (d.t) this._log(room === 'town' ? 'town' : 'near', { id, name: this.me.name, text: cleanText(d.t, 200), mine: true });
+      if (d.t) this._log(room === 'town' ? 'town' : 'near', { id, name: this.me.name, text: cleanText(d.t, 200), mine: true, pin: Array.isArray(d.p) ? d.p : undefined });
       return;
     }
     const p = this.peers.get(id);
@@ -388,8 +442,12 @@ export class Live {
     if (room !== 'town') {
       const dist = Math.hypot(p.tx - this.pos.x, p.tz - this.pos.z);
       if (dist > HEAR) return;
-      if (d.w) {
-        p.wave = Date.now();
+      if (d.e) {
+        if (GESTURES.has(d.e)) {
+          p.gesture = d.e;
+          p.gestureAt = Date.now();
+          this.emit('emote', p, d.e);
+        }
         return;
       }
     }
@@ -399,7 +457,41 @@ export class Live {
       p.say = textOut;
       p.sayUntil = Date.now() + 6500;
     }
-    this._log(room === 'town' ? 'town' : 'near', { id, name: p.name, text: textOut });
+    const msg = { id, name: p.name, text: textOut };
+    if (Array.isArray(d.p) && d.p.length === 2) msg.pin = [finite(d.p[0], -3000, 3000), finite(d.p[1], -3000, 3000)];
+    this._log(room === 'town' ? 'town' : 'near', msg);
+  }
+
+  _onCircle(group, d) {
+    if (group !== this.circle || !d || typeof d !== 'object') return;
+    const id = String(d.i || '');
+    const mine = id === this.id;
+    const p = mine ? null : this.peers.get(id);
+    if (!mine && (!p || this.blocked(id) || !this.bucket.take('k' + id))) return;
+    const name = mine ? this.me.name : p.name;
+    if (d.e === 'chai') return this.emit('chai', mine ? null : p, name);
+    const textOut = mine ? cleanText(d.t, 200) : soften(d.t, 200);
+    if (!textOut) return;
+    if (p) {
+      p.say = textOut;
+      p.sayUntil = Date.now() + 6500;
+    }
+    this._log('katta', { id, name, text: textOut, mine });
+  }
+
+  _onGame(game, d) {
+    if (!d || typeof d !== 'object') return;
+    const id = String(d.i || '');
+    const mine = id === this.id;
+    const p = mine ? null : this.peers.get(id);
+    if (!mine && (!p || this.blocked(id) || !this.bucket.take('g' + id))) return;
+    const name = mine ? this.me.name : p.name;
+    if (game === 'race') {
+      const ms = finite(d.t, 0, 3600000);
+      // nobody laps the lake in under 40 seconds on foot
+      if (ms < 40000) return;
+      this.emit('game', 'race', { id, name, ms, mine });
+    } else if (game === 'hunt') this.emit('game', 'hunt', { id, name, mine });
   }
 
   async _onDirect(d) {

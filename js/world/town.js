@@ -22,8 +22,10 @@ export async function buildTown(data, lib, tier, hooks = {}) {
     const p = unpack(r.p);
     railGrid.addPoly(p, 0, false);
   }
+  const sat = hooks.imagery && hooks.imagery.enabled ? hooks.imagery : null;
   const ctx = {
     walls,
+    imagery: sat,
     solids: [], // [x, z, r] round obstacles (pillars, trunks, poles)
     rng,
     // how much of the surroundings and how much street dressing this device gets
@@ -61,11 +63,15 @@ export async function buildTown(data, lib, tier, hooks = {}) {
   apron(-A, iz0, ix0, iz1);
   apron(ix1, iz0, A, iz1);
 
+  // With satellite imagery the photo itself shows yards, parks and plots, so the drawn ones are skipped.
+  if (sat) sat.ground(m);
+
   // ---- land use ------------------------------------------------------------
   const greens = new PolyGrid(60);
   for (const g of data.land) {
     const p = unpack(g.p);
     g.pts = p;
+    if (sat) continue;
     m.chunk(...centroid(p));
     if (g.k === 'y') m.poly(p, 0.015, '#f0ece4', 'concrete');
     else if (g.k === 'k') m.poly(p, 0.015, '#dcd8d0', 'concrete');
@@ -76,6 +82,7 @@ export async function buildTown(data, lib, tier, hooks = {}) {
     const p = unpack(g.p);
     g.pts = p;
     greens.add(p, g);
+    if (sat) continue;
     m.chunk(...centroid(p));
     m.poly(p, 0.025, g.k === 'g' ? '#e6f0c8' : g.k === 'w' ? '#9fb68a' : '#ffffff', 'grass');
   }
@@ -91,7 +98,7 @@ export async function buildTown(data, lib, tier, hooks = {}) {
     const area = Math.abs(polyArea(p));
     waterPolys.push(p);
     walls.addPoly(p, 2);
-    if (area < 90000 && area > 150) {
+    if (area < 150000 && area > 150) {
       lakes.push({ name: w.n, pts: p, area });
       // stone coping and a paved promenade around each lake
       const closedPts = p.concat([p[0], p[1]]);
@@ -99,7 +106,7 @@ export async function buildTown(data, lib, tier, hooks = {}) {
       for (let i = 1; i < closedPts.length - 1; i++) {
         const a = closedPts[i - 1], b = closedPts[i];
         m.chunk(a[0], a[1]);
-        m.quadUp([prom.L[i - 1][0], 0.035, prom.L[i - 1][1]], [prom.R[i - 1][0], 0.035, prom.R[i - 1][1]], [prom.R[i][0], 0.035, prom.R[i][1]], [prom.L[i][0], 0.035, prom.L[i][1]], null, null, null, null, m.rgb('#ffffff'), 'paver');
+        if (!sat) m.quadUp([prom.L[i - 1][0], 0.035, prom.L[i - 1][1]], [prom.R[i - 1][0], 0.035, prom.R[i - 1][1]], [prom.R[i][0], 0.035, prom.R[i][1]], [prom.L[i][0], 0.035, prom.L[i][1]], null, null, null, null, m.rgb('#ffffff'), 'paver');
         m.beam(a[0], 0.0, a[1], b[0], 0.0, b[1], 0.5, 0.42, '#b9b2a4', 'stone');
         // painted railing along the water's edge
         const el = Math.hypot(b[0] - a[0], b[1] - a[1]);

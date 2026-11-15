@@ -123,6 +123,11 @@ export function buildMaterials(quality) {
     for (const m of nightList) m.emissiveIntensity = (m.userData.dayGlow || 0) + night * m.userData.nightGain;
     lib.pool.opacity = night * 0.5;
     lib.glow.color.setScalar(0.35 + night * 1.4);
+    for (const m of lib.satMats || []) {
+      const k = 1 - wet * 0.35;
+      m.color.setRGB(k, k, k * 1.03);
+      m.roughness = 1 - wet * 0.45;
+    }
     for (const m of wetList) {
       const base = m.userData.baseRough;
       // wet ground is darker and shinier, but still ground rather than a mirror

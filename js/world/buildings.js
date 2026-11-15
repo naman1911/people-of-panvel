@@ -118,14 +118,15 @@ export function buildBuilding(m, b, p, ctx) {
   }
 
   // Roof
-  if (gabled) gableRoof(m, p, H, b.k === 'i' ? 'tin' : 'tile', wallCol, rnd);
+  if (gabled) gableRoof(m, p, H, b.k === 'i' ? 'tin' : 'tile', wallCol, rnd, ctx.imagery);
   else {
-    m.poly(p, H, ROOF_TINTS[(rnd() * ROOF_TINTS.length) | 0], b.k === 'i' ? 'tin' : 'terrace');
+    const tintIdx = (rnd() * ROOF_TINTS.length) | 0; // drawn before the branch so both looks use the same random sequence
+    if (!(ctx.imagery && ctx.imagery.roof(m, p, H + 0.01))) m.poly(p, H, ROOF_TINTS[tintIdx], b.k === 'i' ? 'tin' : 'terrace');
     if (detail && b.k !== 'i') clutter(m, p, H, b, area, rnd, wallCol);
   }
 }
 
-function gableRoof(m, p, H, layer, wallCol, rnd) {
+function gableRoof(m, p, H, layer, wallCol, rnd, sat) {
   const L = (i) => Math.hypot(p[(i + 1) % 4][0] - p[i][0], p[(i + 1) % 4][1] - p[i][1]);
   // rotate so that edges 0 and 2 are the long ones
   const q = L(0) + L(2) >= L(1) + L(3) ? p : [p[1], p[2], p[3], p[0]];
@@ -139,8 +140,11 @@ function gableRoof(m, p, H, layer, wallCol, rnd) {
   const r1 = out(m1, k), r3 = out(m3, k);
   const tint = m.rgb(layer === 'tin' ? ['#b9c6d2', '#c9cdd1', '#9fb4c4', '#d2c5b4'][(rnd() * 4) | 0] : TILE_TINTS[(rnd() * 4) | 0]);
   const yb = H - 0.12, yt = H + rh;
-  m.quadUp([e[0][0], yb, e[0][1]], [e[1][0], yb, e[1][1]], [r1[0], yt, r1[1]], [r3[0], yt, r3[1]], null, null, null, null, tint, layer);
-  m.quadUp([e[2][0], yb, e[2][1]], [e[3][0], yb, e[3][1]], [r3[0], yt, r3[1]], [r1[0], yt, r1[1]], null, null, null, null, tint, layer);
+  const s1 = [[e[0][0], yb, e[0][1]], [e[1][0], yb, e[1][1]], [r1[0], yt, r1[1]], [r3[0], yt, r3[1]]];
+  const s2 = [[e[2][0], yb, e[2][1]], [e[3][0], yb, e[3][1]], [r3[0], yt, r3[1]], [r1[0], yt, r1[1]]];
+  // with satellite imagery the slopes carry the real roof colours
+  if (!(sat && sat.slope(m, ...s1))) m.quadUp(...s1, null, null, null, null, tint, layer);
+  if (!(sat && sat.slope(m, ...s2))) m.quadUp(...s2, null, null, null, null, tint, layer);
   // gable ends
   m.tri([q[2][0], H, q[2][1]], [q[1][0], H, q[1][1]], [m1[0], yt, m1[1]], null, null, null, wallCol, 'plaster');
   m.tri([q[0][0], H, q[0][1]], [q[3][0], H, q[3][1]], [m3[0], yt, m3[1]], null, null, null, wallCol, 'plaster');

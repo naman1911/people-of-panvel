@@ -19,6 +19,8 @@ const defaults = () => ({
   blocked: [], // people this visitor has blocked
   liveOk: false, // has read and accepted the live rules
   live: false, // was live last time, so rejoin
+  raceBest: 0, // best lap of the lake, in ms
+  hunt: null, // { date, found: [] } today's treasure hunt
 });
 
 let state = defaults();

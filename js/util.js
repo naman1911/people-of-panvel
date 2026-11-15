@@ -92,6 +92,12 @@ export function fmtClock(hour) {
   return `${h12}:${String(mm).padStart(2, '0')} ${ap}`;
 }
 
+/** A lap time: 2:07.4 */
+export const fmtTime = (ms) => {
+  const s = ms / 1000;
+  return `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`;
+};
+
 export const isTouch = () =>
   typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches || 'ontouchstart' in window);
 

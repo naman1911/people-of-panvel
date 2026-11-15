@@ -276,7 +276,7 @@ export async function furnish(m, env) {
   // ---- weeds and grass on open plots ----------------------------------------
   {
     const { play } = data.meta;
-    for (let i = 0; i < 2600 * D; i++) {
+    for (let i = 0; i < (ctx.imagery ? 0 : 2600 * D); i++) {
       const x = play.minX - 100 + rnd() * (play.maxX - play.minX + 200), z = play.minZ - 100 + rnd() * (play.maxZ - play.minZ + 200);
       const r = 2.5 + rnd() * 7;
       if (nearBuilding(x, z, Math.min(7.5, r * 0.8)) || onRoad(x, z, r * 0.6) || ctx.onTrack(x, z, r) || inWater(x, z) || inPaved(x, z)) continue;

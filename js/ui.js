@@ -1,12 +1,12 @@
 // The interface: title screen, HUD, name plates, panels, toasts.
 
 import * as THREE from 'three';
-import { h, fmtClock, isTouch } from './util.js';
+import { h, fmtClock, fmtTime, isTouch } from './util.js';
 import { t, L, getLang, setLang, onLang } from './i18n.js';
 import { store } from './store.js';
 import { PEOPLE, KATTA_TALK, POSTERS } from './data/people.js';
 import { HUBS, FAR_PLACES, STAMPS, ZONES } from './data/places.js';
-import { SKIN } from './entities/person.js';
+import { SKIN, EMOTES } from './entities/person.js';
 import { sfx } from './sfx.js';
 
 const AV = ['#c2410c', '#0f766e', '#7c3aed', '#be185d', '#1d4ed8', '#b45309', '#15803d', '#9f1239'];
@@ -37,6 +37,27 @@ export function createUI(game) {
     setTimeout(() => el.remove(), 4300);
   };
 
+  // ---- little bursts of emoji: gestures, a cutting chai, a found modak ------------
+  const fxLayer = h('div.fxlayer');
+  root.append(fxLayer);
+  let cam = null;
+  /** Float an emoji up from a spot in the world, or from the middle of the screen if no spot is given. */
+  ui.fx = (x, y, z, icon) => {
+    let sx = innerWidth / 2, sy = innerHeight * 0.6;
+    if (x != null) {
+      if (!cam) return;
+      v.set(x, y, z);
+      const d = v.distanceTo(cam.position);
+      v.project(cam);
+      if (d > 90 || v.z > 1 || Math.abs(v.x) > 1.1 || Math.abs(v.y) > 1.1) return;
+      sx = ((v.x + 1) / 2) * innerWidth;
+      sy = ((1 - v.y) / 2) * innerHeight;
+    }
+    const el = h('div.fx', { style: { left: sx + 'px', top: sy + 'px' } }, icon);
+    fxLayer.append(el);
+    setTimeout(() => el.remove(), 1700);
+  };
+
   // ---- unread chat counters, private-chat requests -------------------------------
   const unread = new Map();
   const unreadTotal = () => [...unread.values()].reduce((a, b) => a + b, 0);
@@ -53,6 +74,8 @@ export function createUI(game) {
     }, 250);
   };
   ui.onChat = (channel, msg) => {
+    // talk around the bench you are sitting on shows only while you sit there
+    if (channel === 'katta') return ui._circle?.list();
     if (ui.panelName === 'chat' && ui._chat?.cur === channel) return ui._chat.list();
     if (msg.mine) return;
     unread.set(channel, (unread.get(channel) || 0) + 1);
@@ -128,7 +151,16 @@ export function createUI(game) {
   const miniCtx = mini.getContext('2d');
   miniCtx.scale(dpr, dpr);
   const lookHint = h('div.pill.lookhint', { hidden: true });
-  hud.append(board, center, right, dock, keys, promptBtn, guideEl, mini, lookHint);
+  const banner = h('div.banner', { hidden: true });
+  const emotes = h('div.emotes', { hidden: true });
+  hud.append(board, center, right, h('div.hud-dockwrap', emotes, dock), keys, promptBtn, guideEl, mini, lookHint, banner);
+  /** A big readout at the top of the screen: race countdown and lap clock. */
+  ui.setBanner = (text) => {
+    if (banner.hidden === !text && banner.textContent === (text || banner.textContent)) return;
+    banner.hidden = !text;
+    hud.classList.toggle('racing', !!text);
+    if (text) banner.textContent = text;
+  };
   let street = '';
   ui.setStreet = (name) => {
     if (name === street) return;
@@ -190,7 +222,11 @@ export function createUI(game) {
       chip('🛺', t('travel'), 'T', () => ui.open('travel')),
       h('div', { style: { display: 'flex', gap: '6px' } }, clockEl, wxEl),
       countEl);
+    emotes.replaceChildren(...EMOTES.map(([kind, icon], i) =>
+      h('button', { type: 'button', title: t('e_' + kind), onclick: () => { game.emote(kind); if (touch) emotes.hidden = true; } }, icon, touch ? null : h('kbd', String(i + 1)))));
     dock.replaceChildren(
+      chip('🙌', t('gestures'), '1-5', () => (emotes.hidden = !emotes.hidden)),
+      chip('🎲', t('games'), 'P', () => ui.open('games')),
       chip('👁', t('view'), 'V', () => game.toggleView()),
       chip('🗺', t('map'), 'N', () => ui.toggle('map')),
       chip('🎫', t('darshan'), 'B', () => ui.open('darshan')),
@@ -246,9 +282,12 @@ export function createUI(game) {
   ui.setGuide = (g) => {
     guideEl.hidden = !g;
     if (!g) return;
-    if (guideEl._label !== g.label) {
-      guideEl._label = g.label;
-      guideEl.replaceChildren(h('span.arrow', '⬆'), h('span.txt'), h('button.x', { type: 'button', onclick: () => game.guideTo(null) }, '✕'));
+    const key = g.label + (g.walk ? '|w' : '');
+    if (guideEl._label !== key) {
+      guideEl._label = key;
+      guideEl.replaceChildren(...[h('span.arrow', '⬆'), h('span.txt'),
+        g.walk ? h('button.walk', { type: 'button', title: t('walk_me_tip'), onclick: () => game.walkToGuide() }, '🚶 ', t('walk_me')) : null,
+        h('button.x', { type: 'button', onclick: () => game.guideTo(null) }, '✕')].filter(Boolean));
     }
     guideEl.children[0].style.transform = `rotate(${g.angle}rad)`;
     guideEl.children[1].textContent = `${g.label} · ${Math.round(g.dist)} m`;
@@ -294,6 +333,7 @@ export function createUI(game) {
     p.el.style.transform = `translate(${((v.x + 1) / 2) * innerWidth}px, ${((1 - v.y) / 2) * innerHeight}px) translate(-50%, -100%)`;
   }
   ui.updatePlates = (camera, focusId) => {
+    cam = camera;
     const hide = !!ui.panel && innerWidth < 760;
     platesEl.style.display = hide || hud.hidden ? 'none' : '';
     if (hide || hud.hidden) return;
@@ -315,7 +355,7 @@ export function createUI(game) {
       const vp = plateFor(key, '.plate--live');
       setPlate(vp, v.name.toUpperCase(), '', v.status, v.say);
       vp.el.classList.toggle('plate--focus', v.id === focusId);
-      project(vp, v.x, v.person.root.position.y + v.person.height * (v.mode ? 0.82 : 1) + 0.18, v.z, camera, 75);
+      project(vp, v.rx ?? v.x, v.person.root.position.y + v.person.height * (v.mode ? 0.82 : 1) + 0.18, v.rz ?? v.z, camera, 75);
     }
     for (const [key, pl] of plates) {
       if (key.startsWith('live:') && !seen.has(key)) {
@@ -325,7 +365,7 @@ export function createUI(game) {
     }
     const me = store.get('me');
     const mp = plateFor('@me', '.plate--me');
-    if (me && game.player.mode !== 'drive') {
+    if (me && game.player.mode !== 'drive' && game.player.mode !== 'ride') {
       setPlate(mp, me.name.toUpperCase(), '', me.status || '', null);
       const pl = game.player;
       project(mp, pl.pos.x, pl.y + pl.person.height * (pl.mode === 'sit' ? 0.82 : 1) + 0.2, pl.pos.z, camera, 40);
@@ -346,6 +386,7 @@ export function createUI(game) {
     hud.classList.remove('has-panel');
     const was = ui.panelName;
     if (was === 'chat') ui._chat = null;
+    if (was === 'chai') ui._circle = null;
     ui.panelName = null;
     game.onPanel?.(null, was);
   };
@@ -391,7 +432,7 @@ export function createUI(game) {
       h('p.copy', L(d.story)),
       spoken,
       h('div.row',
-        h('button.btn', { type: 'button', onclick: () => { const line = game.say(n); spoken.replaceChildren(h('div.spoken', line)); sfx.hello(); } }, '🙏 ', t('say_namaskar')),
+        h('button.btn', { type: 'button', onclick: () => { const line = game.say(n); spoken.replaceChildren(h('div.spoken', line)); game.emote('namaskar'); } }, '🙏 ', t('say_namaskar')),
         kattaBtn()),
       h('hr.perf'),
       h('p.small', t('fictional')));
@@ -449,7 +490,7 @@ export function createUI(game) {
       const online = [...game.live.peers.values()].filter((v) => !q || (v.name + ' ' + v.status).toLowerCase().includes(q)).sort((a, b) => (a.dist ?? 1e9) - (b.dist ?? 1e9)).slice(0, 12);
       if (online.length) {
         list.prepend(h('div.k', '🟢 ', t('online_now')), ...online.map((v) =>
-          h('button.item', { type: 'button', onclick: () => { ui.close(); game.guideTo({ x: v.tx, z: v.tz, label: v.name, peer: v }); } },
+          h('button.item', { type: 'button', onclick: () => ui.open('visitor', v) },
             h('div.avatar', { style: { background: '#1f9a55' } }, v.name[0]),
             h('div.item-body', h('b', v.name), h('span', v.status || t('visitor_tag'))),
             h('div.item-end', t('away', { d: Math.round(Math.hypot(v.tx - game.player.pos.x, v.tz - game.player.pos.z)) })))),
@@ -594,23 +635,65 @@ export function createUI(game) {
 
   let chaiTimer = 0;
   P.chai = (seat) => {
+    const live = game.live;
     const talk = h('div.talk');
     const lang = getLang();
-    const pool = [...KATTA_TALK];
-    // residents near this stall join in
-    for (const n of game.residents.list) if (Math.hypot(n.x - seat.x, n.z - seat.z) < 22) for (const l of n.def.lines) pool.push({ en: `${n.def.name.en}: “${l.en}”`, mr: `${n.def.name.mr}: “${l.mr}”` });
-    const add = () => {
-      if (!pool.length) return;
-      const line = pool.splice((Math.random() * pool.length) | 0, 1)[0];
-      talk.append(h('div.bubble', line[lang] || line.en));
-      while (talk.children.length > 6) talk.firstChild.remove();
-    };
-    add();
     clearInterval(chaiTimer);
-    chaiTimer = setInterval(() => (ui.panelName === 'chai' ? add() : clearInterval(chaiTimer)), 3600);
-    game.mission('chai');
-    show('chai', 'left', ...head('☕', t('chai_title'), t('chai_sub')), talk,
-      h('div.row', h('span'), h('button.btn.btn--ghost', { type: 'button', onclick: () => ui.close() }, t('stand_up'))));
+    if (seat.chai) {
+      const pool = [...KATTA_TALK];
+      // residents near this stall join in
+      for (const n of game.residents.list) if (Math.hypot(n.x - seat.x, n.z - seat.z) < 22) for (const l of n.def.lines) pool.push({ en: `${n.def.name.en}: “${l.en}”`, mr: `${n.def.name.mr}: “${l.mr}”` });
+      const add = () => {
+        if (!pool.length) return;
+        const line = pool.splice((Math.random() * pool.length) | 0, 1)[0];
+        talk.append(h('div.bubble', line[lang] || line.en));
+        while (talk.children.length > (live.online ? 2 : 6)) talk.firstChild.remove();
+      };
+      add();
+      chaiTimer = setInterval(() => (ui.panelName === 'chai' ? add() : clearInterval(chaiTimer)), live.online ? 7000 : 3600);
+      game.mission('chai');
+    }
+    // the circle: real people sitting at this stall or bench talk among themselves
+    let circle = null;
+    if (live.online) {
+      const who = h('p.small'), listEl = h('div.chatlist.chatlist--sm');
+      const input = h('input.input', { type: 'text', maxLength: 200, autocomplete: 'off', enterKeyHint: 'send', placeholder: t('circle_ph') });
+      const C = (ui._circle = {
+        list() {
+          const log = live.logs.katta || [];
+          listEl.replaceChildren(...log.map((m) => h('div.msg' + (m.mine ? '.mine' : ''), h('b', m.mine ? t('you') : m.name), m.text)));
+          listEl.scrollTop = listEl.scrollHeight;
+        },
+        who() {
+          const names = [...live.peers.values()].filter((p) => p.mode === 1 && Math.hypot(p.tx - seat.x, p.tz - seat.z) < 7).map((p) => p.name);
+          who.textContent = names.length ? t('circle_with', { names: names.join(', ') }) : t('circle_alone');
+        },
+      });
+      const send = () => {
+        if (!input.value.trim()) return;
+        if (live.circleSay(input.value)) input.value = '';
+        else ui.toast(t('slow_down'));
+        input.focus();
+      };
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          send();
+        }
+      };
+      C.list();
+      C.who();
+      const whoTimer = setInterval(() => (ui._circle === C ? C.who() : clearInterval(whoTimer)), 2000);
+      circle = [h('hr.perf'), h('div.k', '🟢 ', t('circle_title')), who, listEl,
+        h('div.chatform', input, h('button.btn', { type: 'button', onclick: send }, t('send'))),
+        h('div.row', { style: { marginTop: '8px' } },
+          h('button.btn.btn--gold.btn--sm', { type: 'button', onclick: () => live.circleSay('', true) || ui.toast(t('slow_down')) }, '☕ ', t('offer_chai')),
+          h('button.btn.btn--ghost.btn--sm', { type: 'button', onclick: () => ui.close() }, t('stand_up')))];
+    }
+    show('chai', 'left', ...head(seat.chai ? '☕' : '🪑', t(seat.chai ? 'chai_title' : 'bench_title'), t(seat.chai ? 'chai_sub' : 'bench_sub')), talk,
+      circle || [
+        h('p.small', { style: { marginTop: '12px' } }, t('circle_offline')),
+        h('div.row', h('button.btn.btn--gold.btn--sm', { type: 'button', onclick: () => game.goLive() }, '🟢 ', t('go_live')), h('button.btn.btn--ghost', { type: 'button', onclick: () => ui.close() }, t('stand_up')))]);
   };
 
   P.golive = () => {
@@ -639,11 +722,13 @@ export function createUI(game) {
     C.list = () => {
       const log = live.logs[C.cur] || [];
       const kind = dmId() ? 'dm' : C.cur;
-      listEl.replaceChildren(...(log.length ? log.map((m) => h('div.msg' + (m.mine ? '.mine' : ''), h('b', m.mine ? t('you') : m.name), m.text)) : [h('p.small', t('chat_empty_' + kind))]));
+      listEl.replaceChildren(...(log.length ? log.map((m) => h('div.msg' + (m.mine ? '.mine' : ''), h('b', m.mine ? t('you') : m.name), m.text,
+        m.pin ? h('button.pinlink', { type: 'button', onclick: () => { ui.close(); game.guideTo({ x: m.pin[0], z: m.pin[1], label: '📍 ' + (m.mine ? t('you') : m.name) }); } }, '📍 ', t('show_me'), ' ▸') : null)) : [h('p.small', t('chat_empty_' + kind))]));
       listEl.scrollTop = listEl.scrollHeight;
       input.placeholder = t('chat_ph_' + kind);
       noteEl.textContent = t(dmId() ? 'chat_private' : 'chat_public');
       endEl.replaceChildren(dmId() ? h('button.link', { type: 'button', onclick: () => live.close(dmId()) }, t('end_chat')) : '');
+      pinBtn.hidden = !!dmId();
     };
     C.pick = (key) => {
       C.cur = ui._chatTab = key;
@@ -652,6 +737,13 @@ export function createUI(game) {
       C.list();
       ui.liveChanged();
     };
+    // "meet me here": your message carries the spot you are standing on
+    const sendPin = () => {
+      const pl = game.player.pos;
+      if (live.say(input.value.trim() || t('meet_here_msg'), C.cur, [pl.x, pl.z])) input.value = '';
+      else ui.toast(t('slow_down'));
+    };
+    const pinBtn = h('button.btn.btn--ghost', { type: 'button', title: t('meet_here'), onclick: sendPin }, '📍');
     const send = async () => {
       const text = input.value;
       if (!text.trim()) return;
@@ -667,7 +759,7 @@ export function createUI(game) {
       }
     };
     show('chat', 'left', ...head('💬', t('chat_title')), tabsEl, listEl,
-      h('div.chatform', input, h('button.btn', { type: 'button', onclick: send }, t('send'))),
+      h('div.chatform', input, pinBtn, h('button.btn', { type: 'button', onclick: send }, t('send'))),
       noteEl, endEl,
       h('hr.perf'),
       h('div.row', { style: { marginTop: 0 } }, h('span.small', '🟢 ', t('live_title')), h('button.link', { type: 'button', onclick: () => { ui.close(); game.leaveLive(); } }, t('leave_live'))));
@@ -683,16 +775,42 @@ export function createUI(game) {
       v.status ? h('div.status', v.status) : null,
       h('p.small', { style: { marginTop: '10px' } }, t('visitor_note')),
       h('div.row',
-        h('button.btn', { type: 'button', onclick: () => { live.wave(); game.player.person.wave(1.6); sfx.hello(); } }, '👋 ', t('wave')),
+        h('button.btn', { type: 'button', onclick: () => game.emote('wave') }, '👋 ', t('wave')),
         h('button.btn.btn--gold', { type: 'button', onclick: () => {
           if (live.links.get(v.id) === 'open') return ui.open('chat', 'dm:' + v.id);
           live.ask(v.id);
           ui.toast(t('asked', { name: v.name }));
         } }, '🔒 ', t('ask_private'))),
+      h('div.row',
+        h('button.btn.btn--ghost', { type: 'button', onclick: () => { ui.close(); game.guideTo({ x: v.tx, z: v.tz, label: v.name, peer: v }); } }, '📍 ', t('show_me')),
+        h('button.btn.btn--ghost', { type: 'button', onclick: () => { ui.close(); game.follow(v); } }, '🚶 ', t('follow'))),
+      v.mode === 2 ? h('div.row', h('span.small', t('hop_in_note')), h('button.btn.btn--ghost', { type: 'button', onclick: () => { ui.close(); game.hopIn(v); } }, '🛺 ', t('hop_in_btn'))) : null,
       h('hr.perf'),
       h('div.row', { style: { marginTop: 0 } },
         h('button.link', { type: 'button', onclick: () => { if (confirm(t('block_sure', { name: v.name }))) { live.block(v.id); ui.close(); ui.toast(t('blocked')); } } }, '🚫 ', t('block')),
         h('a.link', { href: game.reportUrl(v), target: '_blank', rel: 'noopener' }, '⚑ ', t('report'))));
+  };
+
+  P.games = () => {
+    const G = game.games, r = G.race, hu = G.hunt;
+    const left = hu.total - hu.found.length;
+    const board = r.board.slice(0, 5);
+    show('games', 'center', ...head('🎲', t('games_title'), t('games_sub')),
+      r.ok ? h('div.game',
+        h('div.game-top', h('span.big', '🏁'), h('div', h('b', t('race_title')), h('span', t('race_sub', { m: Math.round(r.len / 10) * 10 })))),
+        h('p.small', r.best ? t('race_your_best', { time: fmtTime(r.best) }) : t('race_no_best')),
+        board.length ? h('ol.scores', ...board.map((b) => h('li' + (b.mine ? '.mine' : ''), h('span', b.name), h('b', fmtTime(b.ms))))) : null,
+        h('div.row', h('span.small', t('race_how')), h('button.btn.btn--sm', { type: 'button', onclick: () => { ui.close(); game.guideTo({ x: r.gates[0].x, z: r.gates[0].z, label: t('race_title') }); } }, t('show_start'), ' ▸'))) : null,
+      h('div.game',
+        h('div.game-top', h('span.big', '🥇'), h('div', h('b', t('hunt_title')), h('span', t('hunt_sub', { t: hu.total })))),
+        h('div.progress', h('i', { style: { width: (hu.found.length / hu.total) * 100 + '%' } })),
+        h('p.small', left ? t('hunt_left', { n: hu.found.length, t: hu.total }) : t('hunt_all')),
+        hu.done.length ? h('p.small', '🎉 ', t('hunt_done_by', { names: hu.done.slice(-6).join(', ') })) : null,
+        left ? h('div.row', h('span.small', t('hunt_how')), h('button.btn.btn--sm', { type: 'button', onclick: () => {
+          const s = G.hintSpot();
+          ui.close();
+          if (s) game.guideTo({ x: s.x, z: s.z, label: t('hunt_hint') });
+        } }, t('hunt_hint_btn'), ' ▸')) : null));
   };
 
   P.first = () => {
@@ -713,7 +831,7 @@ export function createUI(game) {
       h('div.keys',
         ...(touch
           ? [['👆', t('k_move')], ['👉', t('k_look')], ['E', t('k_use')]]
-          : [['WASD', t('k_move')], ['SHIFT', t('k_run')], ['🖱 / ← →', t('k_look')], ['V', t('view_help')], ['E', t('k_use')], ['N', t('map')], ['F', t('find')], ['T', t('travel')], ['B', t('darshan')], ['C', t('katta')], ['M', t('me')], ['ESC', t('k_close')]]
+          : [['WASD', t('k_move')], ['SHIFT', t('k_run')], ['🖱 / ← →', t('k_look')], ['V', t('view_help')], ['E', t('k_use')], ['1-5', t('gestures')], ['P', t('games')], ['N', t('map')], ['F', t('find')], ['T', t('travel')], ['B', t('darshan')], ['C', t('katta')], ['M', t('me')], ['ESC', t('k_close')]]
         ).flatMap(([k, s]) => [h('kbd', k), h('span', s)])),
       h('div.row', h('button.btn.btn--ghost.btn--sm', { type: 'button', onclick: () => ui.open('first') }, '👋 ', t('first_title'))),
       h('hr.perf'),
@@ -733,6 +851,15 @@ export function createUI(game) {
     P[name](arg);
   };
   ui.toggle = (name, arg) => (ui.panelName === name ? ui.close() : ui.open(name, arg));
+  /** Redraw the open panel in place, without the side effects of closing it (such as standing up from a bench). */
+  ui.redraw = (name, arg) => {
+    ui.swapping = true;
+    try {
+      P[name](arg);
+    } finally {
+      ui.swapping = false;
+    }
+  };
   ui.redrawHud = () => !hud.hidden && drawHud();
 
   // ---- travel overlay --------------------------------------------------------------

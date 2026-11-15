@@ -75,6 +75,11 @@ class Baker {
   }
 }
 
+export const EMOTE_SECONDS = { wave: 1.6, namaskar: 2.2, clap: 2.2, dance: 5, laugh: 2.2, cheers: 2.4 };
+/** The gestures offered in the interface, in order (keys 1 to 5). */
+export const EMOTES = [['namaskar', '🙏'], ['wave', '👋'], ['clap', '👏'], ['dance', '💃'], ['laugh', '😂']];
+export const EMOTE_ICON = { namaskar: '🙏', wave: '👋', clap: '👏', dance: '💃', laugh: '😂', cheers: '☕' };
+
 export const SKIN = ['#8d5a3b', '#a4683f', '#b97c52', '#c68e63', '#7a4a2f', '#d2a078'];
 const HAIR = ['#1a1412', '#221a16', '#2b1f18', '#3a2a20'];
 
@@ -201,13 +206,22 @@ export class Person {
 
     this.phase = Math.random() * 6.28;
     this.pose = 'stand';
-    this.waveT = 0;
+    this.emoteT = 0;
+    this.emoteAge = 0;
+    this.emoteKind = '';
     this.height = 1.72 * L.h;
     this.shadows = true;
   }
 
   wave(seconds = 1.6) {
-    this.waveT = seconds;
+    this.emote('wave', seconds);
+  }
+
+  /** Play a gesture: wave, namaskar, clap, dance, laugh, cheers. */
+  emote(kind, seconds) {
+    this.emoteKind = kind;
+    this.emoteT = seconds ?? EMOTE_SECONDS[kind] ?? 2;
+    this.emoteAge = 0;
   }
 
   /** speed in m/s; pose: 'stand' | 'sit' | 'drive'. */
@@ -215,25 +229,79 @@ export class Person {
     this.pose = pose;
     const [la, ra] = this.arms, [ll, rl] = this.legs;
     const k = 1 - Math.exp(-dt * 12);
-    let legL = 0, legR = 0, armL = 0, armR = 0, bob = 0, lean = 0, armZ = 0.06;
-    if (pose === 'sit' || pose === 'drive') {
+    // targets for this frame
+    let legL = 0, legR = 0, aLx = 0, aRx = 0, aLz = 0.06, aRz = -0.06, bob = 0, lean = 0, twist = 0;
+    const seated = pose === 'sit' || pose === 'drive';
+    if (seated) {
       legL = legR = -1.45;
-      armL = armR = pose === 'drive' ? -1.1 : -0.35;
+      aLx = aRx = pose === 'drive' ? -1.1 : -0.35;
       bob = -0.36;
     } else if (speed > 0.15) {
       this.phase += dt * (4.2 + speed * 1.25);
       const amp = Math.min(0.9, 0.34 + speed * 0.085);
-      const s = Math.sin(this.phase);
-      legL = s * amp;
-      legR = -s * amp;
-      armL = -s * amp * 0.8;
-      armR = s * amp * 0.8;
+      const sw = Math.sin(this.phase);
+      legL = sw * amp;
+      legR = -sw * amp;
+      aLx = -sw * amp * 0.8;
+      aRx = sw * amp * 0.8;
       bob = Math.abs(Math.cos(this.phase)) * 0.03 * Math.min(1, speed / 3);
       lean = Math.min(0.16, speed * 0.016);
     } else {
       this.phase += dt * 1.4;
-      armL = armR = Math.sin(this.phase) * 0.03;
+      aLx = aRx = Math.sin(this.phase) * 0.03;
       bob = Math.sin(this.phase * 0.9) * 0.004;
+    }
+    // a gesture overrides the arms (and, standing still, the body)
+    if (this.emoteT > 0) {
+      this.emoteT -= dt;
+      const t = (this.emoteAge += dt);
+      const still = !seated && speed < 0.3;
+      switch (this.emoteKind) {
+        case 'wave':
+          aRx = -2.7;
+          aRz = -0.25 + Math.sin(t * 13) * 0.32;
+          break;
+        case 'namaskar':
+          aLx = aRx = -1.18;
+          aLz = 0.52;
+          aRz = -0.52;
+          if (still) lean = 0.24 * Math.min(1, t * 3);
+          break;
+        case 'clap': {
+          const c = 0.26 + 0.24 * Math.sin(t * 19);
+          aLx = aRx = -1.3;
+          aLz = c;
+          aRz = -c;
+          break;
+        }
+        case 'dance': {
+          const d = Math.sin(t * 7);
+          aLx = -2.5 + d * 0.6;
+          aRx = -2.5 - d * 0.6;
+          aLz = 0.3;
+          aRz = -0.3;
+          if (still) {
+            bob = Math.abs(d) * 0.07;
+            twist = Math.sin(t * 3.5) * 0.5;
+            legL = d * 0.3;
+            legR = -d * 0.3;
+          }
+          break;
+        }
+        case 'laugh':
+          aLz = 0.4;
+          aRz = -0.4;
+          aLx = aRx = -0.25;
+          if (still) {
+            bob = Math.abs(Math.sin(t * 16)) * 0.035;
+            lean = -0.14;
+          }
+          break;
+        case 'cheers':
+          aRx = -1.55;
+          aRz = -0.12;
+          break;
+      }
     }
     if (this.skirt) {
       legL *= 0.35;
@@ -241,19 +309,14 @@ export class Person {
     }
     ll.rotation.x += (legL - ll.rotation.x) * k;
     rl.rotation.x += (legR - rl.rotation.x) * k;
-    la.rotation.x += (armL - la.rotation.x) * k;
-    if (this.waveT > 0) {
-      this.waveT -= dt;
-      ra.rotation.x += (-2.7 - ra.rotation.x) * k;
-      ra.rotation.z = -0.25 + Math.sin(this.waveT * 13) * 0.32;
-    } else {
-      ra.rotation.x += (armR - ra.rotation.x) * k;
-      ra.rotation.z += (-armZ - ra.rotation.z) * k;
-    }
-    la.rotation.z = armZ;
+    la.rotation.x += (aLx - la.rotation.x) * k;
+    ra.rotation.x += (aRx - ra.rotation.x) * k;
+    la.rotation.z += (aLz - la.rotation.z) * k;
+    ra.rotation.z += (aRz - ra.rotation.z) * k;
     this.body.position.y += (bob - this.body.position.y) * k;
+    this.body.rotation.y += (twist - this.body.rotation.y) * k;
     this.torso.rotation.x += (lean - this.torso.rotation.x) * k;
-    if (this.skirt) this.skirt.visible = pose !== 'sit' && pose !== 'drive';
+    if (this.skirt) this.skirt.visible = !seated;
     this.blob.visible = pose !== 'drive';
   }
 
