@@ -26,48 +26,48 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Mukta:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <!-- Run `node tools/stamp.mjs` before each release: it bumps every ?v= number, so phones never mix old and new files. -->
-  <link rel="stylesheet" href="css/style.css?v=7" />
+  <link rel="stylesheet" href="css/style.css?v=8" />
   <!-- The import map must come before anything that loads a module. -->
-  <script type="importmap">{"imports":{"three":"./vendor/three.module.min.js","./js/config.js":"./js/config.js?v=7","./js/data/places.js":"./js/data/places.js?v=7","./js/data/streets.js":"./js/data/streets.js?v=7","./js/entities/actors.js":"./js/entities/actors.js?v=7","./js/entities/person.js":"./js/entities/person.js?v=7","./js/gfx/facades.js":"./js/gfx/facades.js?v=7","./js/gfx/materials.js":"./js/gfx/materials.js?v=7","./js/gfx/renderer.js":"./js/gfx/renderer.js?v=7","./js/gfx/sky.js":"./js/gfx/sky.js?v=7","./js/gfx/surfaces.js":"./js/gfx/surfaces.js?v=7","./js/gfx/texkit.js":"./js/gfx/texkit.js?v=7","./js/i18n.js":"./js/i18n.js?v=7","./js/input.js":"./js/input.js?v=7","./js/main.js":"./js/main.js?v=7","./js/minimap.js":"./js/minimap.js?v=7","./js/net/invite.js":"./js/net/invite.js?v=7","./js/net/live.js":"./js/net/live.js?v=7","./js/net/mqtt.js":"./js/net/mqtt.js?v=7","./js/net/safety.js":"./js/net/safety.js?v=7","./js/sfx.js":"./js/sfx.js?v=7","./js/store.js":"./js/store.js?v=7","./js/ui.js":"./js/ui.js?v=7","./js/util.js":"./js/util.js?v=7","./js/world/buildings.js":"./js/world/buildings.js?v=7","./js/world/geom.js":"./js/world/geom.js?v=7","./js/world/imagery.js":"./js/world/imagery.js?v=7","./js/world/mesher.js":"./js/world/mesher.js?v=7","./js/world/models.js":"./js/world/models.js?v=7","./js/world/naming.js":"./js/world/naming.js?v=7","./js/world/props.js":"./js/world/props.js?v=7","./js/world/roads.js":"./js/world/roads.js?v=7","./js/world/setpieces.js":"./js/world/setpieces.js?v=7","./js/world/signs.js":"./js/world/signs.js?v=7","./js/world/town.js":"./js/world/town.js?v=7","./js/world/water.js":"./js/world/water.js?v=7","./js/world/world.js":"./js/world/world.js?v=7"}}</script>
+  <script type="importmap">{"imports":{"three":"./vendor/three.module.min.js","./js/config.js":"./js/config.js?v=8","./js/data/places.js":"./js/data/places.js?v=8","./js/data/streets.js":"./js/data/streets.js?v=8","./js/entities/actors.js":"./js/entities/actors.js?v=8","./js/entities/person.js":"./js/entities/person.js?v=8","./js/gfx/facades.js":"./js/gfx/facades.js?v=8","./js/gfx/materials.js":"./js/gfx/materials.js?v=8","./js/gfx/renderer.js":"./js/gfx/renderer.js?v=8","./js/gfx/sky.js":"./js/gfx/sky.js?v=8","./js/gfx/surfaces.js":"./js/gfx/surfaces.js?v=8","./js/gfx/texkit.js":"./js/gfx/texkit.js?v=8","./js/i18n.js":"./js/i18n.js?v=8","./js/input.js":"./js/input.js?v=8","./js/main.js":"./js/main.js?v=8","./js/minimap.js":"./js/minimap.js?v=8","./js/net/invite.js":"./js/net/invite.js?v=8","./js/net/live.js":"./js/net/live.js?v=8","./js/net/mqtt.js":"./js/net/mqtt.js?v=8","./js/net/safety.js":"./js/net/safety.js?v=8","./js/sfx.js":"./js/sfx.js?v=8","./js/store.js":"./js/store.js?v=8","./js/ui.js":"./js/ui.js?v=8","./js/util.js":"./js/util.js?v=8","./js/world/buildings.js":"./js/world/buildings.js?v=8","./js/world/geom.js":"./js/world/geom.js?v=8","./js/world/imagery.js":"./js/world/imagery.js?v=8","./js/world/mesher.js":"./js/world/mesher.js?v=8","./js/world/models.js":"./js/world/models.js?v=8","./js/world/naming.js":"./js/world/naming.js?v=8","./js/world/props.js":"./js/world/props.js?v=8","./js/world/roads.js":"./js/world/roads.js?v=8","./js/world/setpieces.js":"./js/world/setpieces.js?v=8","./js/world/signs.js":"./js/world/signs.js?v=8","./js/world/town.js":"./js/world/town.js?v=8","./js/world/water.js":"./js/world/water.js?v=8","./js/world/world.js":"./js/world/world.js?v=8"}}</script>
   <!-- preload:start -->
   <link rel="preload" href="data/panvel.json" as="fetch" crossorigin="anonymous" />
   <link rel="modulepreload" href="vendor/three.module.min.js" />
-  <link rel="modulepreload" href="js/config.js?v=7" />
-  <link rel="modulepreload" href="js/data/places.js?v=7" />
-  <link rel="modulepreload" href="js/data/streets.js?v=7" />
-  <link rel="modulepreload" href="js/entities/actors.js?v=7" />
-  <link rel="modulepreload" href="js/entities/person.js?v=7" />
-  <link rel="modulepreload" href="js/gfx/facades.js?v=7" />
-  <link rel="modulepreload" href="js/gfx/materials.js?v=7" />
-  <link rel="modulepreload" href="js/gfx/renderer.js?v=7" />
-  <link rel="modulepreload" href="js/gfx/sky.js?v=7" />
-  <link rel="modulepreload" href="js/gfx/surfaces.js?v=7" />
-  <link rel="modulepreload" href="js/gfx/texkit.js?v=7" />
-  <link rel="modulepreload" href="js/i18n.js?v=7" />
-  <link rel="modulepreload" href="js/input.js?v=7" />
-  <link rel="modulepreload" href="js/main.js?v=7" />
-  <link rel="modulepreload" href="js/minimap.js?v=7" />
-  <link rel="modulepreload" href="js/net/invite.js?v=7" />
-  <link rel="modulepreload" href="js/net/live.js?v=7" />
-  <link rel="modulepreload" href="js/net/mqtt.js?v=7" />
-  <link rel="modulepreload" href="js/net/safety.js?v=7" />
-  <link rel="modulepreload" href="js/sfx.js?v=7" />
-  <link rel="modulepreload" href="js/store.js?v=7" />
-  <link rel="modulepreload" href="js/ui.js?v=7" />
-  <link rel="modulepreload" href="js/util.js?v=7" />
-  <link rel="modulepreload" href="js/world/buildings.js?v=7" />
-  <link rel="modulepreload" href="js/world/geom.js?v=7" />
-  <link rel="modulepreload" href="js/world/imagery.js?v=7" />
-  <link rel="modulepreload" href="js/world/mesher.js?v=7" />
-  <link rel="modulepreload" href="js/world/models.js?v=7" />
-  <link rel="modulepreload" href="js/world/naming.js?v=7" />
-  <link rel="modulepreload" href="js/world/props.js?v=7" />
-  <link rel="modulepreload" href="js/world/roads.js?v=7" />
-  <link rel="modulepreload" href="js/world/setpieces.js?v=7" />
-  <link rel="modulepreload" href="js/world/signs.js?v=7" />
-  <link rel="modulepreload" href="js/world/town.js?v=7" />
-  <link rel="modulepreload" href="js/world/water.js?v=7" />
-  <link rel="modulepreload" href="js/world/world.js?v=7" />
+  <link rel="modulepreload" href="js/config.js?v=8" />
+  <link rel="modulepreload" href="js/data/places.js?v=8" />
+  <link rel="modulepreload" href="js/data/streets.js?v=8" />
+  <link rel="modulepreload" href="js/entities/actors.js?v=8" />
+  <link rel="modulepreload" href="js/entities/person.js?v=8" />
+  <link rel="modulepreload" href="js/gfx/facades.js?v=8" />
+  <link rel="modulepreload" href="js/gfx/materials.js?v=8" />
+  <link rel="modulepreload" href="js/gfx/renderer.js?v=8" />
+  <link rel="modulepreload" href="js/gfx/sky.js?v=8" />
+  <link rel="modulepreload" href="js/gfx/surfaces.js?v=8" />
+  <link rel="modulepreload" href="js/gfx/texkit.js?v=8" />
+  <link rel="modulepreload" href="js/i18n.js?v=8" />
+  <link rel="modulepreload" href="js/input.js?v=8" />
+  <link rel="modulepreload" href="js/main.js?v=8" />
+  <link rel="modulepreload" href="js/minimap.js?v=8" />
+  <link rel="modulepreload" href="js/net/invite.js?v=8" />
+  <link rel="modulepreload" href="js/net/live.js?v=8" />
+  <link rel="modulepreload" href="js/net/mqtt.js?v=8" />
+  <link rel="modulepreload" href="js/net/safety.js?v=8" />
+  <link rel="modulepreload" href="js/sfx.js?v=8" />
+  <link rel="modulepreload" href="js/store.js?v=8" />
+  <link rel="modulepreload" href="js/ui.js?v=8" />
+  <link rel="modulepreload" href="js/util.js?v=8" />
+  <link rel="modulepreload" href="js/world/buildings.js?v=8" />
+  <link rel="modulepreload" href="js/world/geom.js?v=8" />
+  <link rel="modulepreload" href="js/world/imagery.js?v=8" />
+  <link rel="modulepreload" href="js/world/mesher.js?v=8" />
+  <link rel="modulepreload" href="js/world/models.js?v=8" />
+  <link rel="modulepreload" href="js/world/naming.js?v=8" />
+  <link rel="modulepreload" href="js/world/props.js?v=8" />
+  <link rel="modulepreload" href="js/world/roads.js?v=8" />
+  <link rel="modulepreload" href="js/world/setpieces.js?v=8" />
+  <link rel="modulepreload" href="js/world/signs.js?v=8" />
+  <link rel="modulepreload" href="js/world/town.js?v=8" />
+  <link rel="modulepreload" href="js/world/water.js?v=8" />
+  <link rel="modulepreload" href="js/world/world.js?v=8" />
   <link rel="modulepreload" href="vendor/addons/math/SimplexNoise.js" />
   <link rel="modulepreload" href="vendor/addons/objects/Sky.js" />
   <link rel="modulepreload" href="vendor/addons/objects/Water.js" />
@@ -97,6 +97,6 @@
     <div class="boot-track"><i id="boot-bar"></i></div>
   </div>
   <noscript><p style="padding:24px;color:#fff">People of Panvel needs JavaScript and WebGL to run.</p></noscript>
-  <script type="module" src="js/main.js?v=7"></script>
+  <script type="module" src="js/main.js?v=8"></script>
 </body>
 </html>

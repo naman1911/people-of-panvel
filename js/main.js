@@ -17,7 +17,7 @@ import { World } from './world/world.js';
 import { createImagery } from './world/imagery.js';
 import { CONFIG } from './config.js';
 import { Input } from './input.js';
-import { Player, CameraRig, Crowd, Traffic, Rickshaws, Strays, Walkers, LocalTrain, Visitors } from './entities/actors.js';
+import { Player, CameraRig, Traffic, Rickshaws, Strays, LocalTrain, Visitors } from './entities/actors.js';
 import { completeLook } from './entities/person.js';
 import { Live } from './net/live.js';
 import { openInvite, tidyCode } from './net/invite.js';
@@ -134,12 +134,10 @@ async function start() {
   const player = new Player(scene, world);
   const rig = new CameraRig(camera);
   const light = R.tier.name === 'low';
-  // the town's own life: passers-by, traffic, parked rickshaws, sleeping strays, lake walkers, the local train
-  const crowd = new Crowd(scene, world, light ? 12 : 34);
+  // The town's own life is vehicles and animals only. Every person you see here is a real member.
   const traffic = new Traffic(scene, world, lib, light ? 9 : 22);
   new Rickshaws(scene, world, lib, spots.autos);
   new Strays(scene, world, lib, spots.hubs.map((s, i) => ({ x: s.x + 5 + i, z: s.z - 6 })));
-  const walkers = new Walkers(scene, town.ctx.promenades || [], light ? 6 : 16);
   const train = spots.trainPath ? new LocalTrain(scene, lib, spots.trainPath) : null;
 
   // street lamps that actually light things near you at night
@@ -430,9 +428,7 @@ async function start() {
         game.stopWalk();
       }
       rig.update(dt, look, input.turn(), player, world);
-      crowd.update(dt, player);
       traffic.update(dt, player);
-      walkers.update(dt, player);
       // facing: where you look in first person, where the body points otherwise
       live.update(player.pos.x, player.pos.z, rig.fp && !player.auto ? rig.yaw + Math.PI : player.yaw, player.speed);
       visitors.update(dt, live, player);

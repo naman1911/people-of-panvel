@@ -22,7 +22,7 @@ Nothing else is on screen: the name of the place you are in, who is around, a pl
 
 - About 4,600 building footprints, the full street network, Vadale Talav and the other lakes, the river, the flyover, the rail lines and the platforms of Panvel Junction, all from OpenStreetMap and placed where they really are.
 - Street nameboards, signboards on hospitals, banks, schools and shops that the map records, and housing-society name plates.
-- Traffic that keeps left, passers-by, a local train that pulls in and out of the junction, evening walkers round the lake.
+- Traffic that keeps left, and a local train that pulls in and out of the junction. There are no computer-run people: everyone you see walking is a real member.
 - The sun follows the real solar path for Panvel at the current time in India. The monsoon months bring rain.
 - With an imagery key, the ground and rooftops are drawn from aerial photographs. See [Satellite imagery](#satellite-imagery).
 
@@ -115,7 +115,7 @@ The script projects the data to metres around the ST depot, splits streets into 
 - Private conversations between two members.
 - Anything that needs a server: accounts, a shared list of members, messages that are still there tomorrow.
 
-Earlier versions had fictional residents, landmark stamps, drivable rickshaws, tea-stall circles, gestures and street games. They were removed to keep the site about roaming and real people. They remain in the git history.
+Earlier versions had fictional residents, computer-run passers-by, landmark stamps, drivable rickshaws, tea-stall circles, gestures and street games. They were removed to keep the site about roaming and real people. They remain in the git history.
 
 ## Project layout
 

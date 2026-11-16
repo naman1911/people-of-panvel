@@ -2,11 +2,11 @@
 // traffic, the rickshaws you can drive, and the strays.
 
 import * as THREE from 'three';
-import { Person, completeLook } from './person.js';
+import { Person } from './person.js';
 import { Mesher } from '../world/mesher.js';
 import * as M from '../world/models.js';
 import { along } from '../world/geom.js';
-import { clamp, angDiff, mulberry32, hashStr } from '../util.js';
+import { clamp, angDiff, mulberry32 } from '../util.js';
 
 // A brisk walk and an easy jog: real paces, so streets feel their real length.
 const WALK = 2.9, RUN = 6.8;
@@ -186,73 +186,6 @@ export class CameraRig {
   }
 }
 
-// ---- passers-by ---------------------------------------------------------------------
-
-export class Crowd {
-  constructor(scene, world, count) {
-    this.world = world;
-    this.rnd = mulberry32(99);
-    this.list = [];
-    for (let i = 0; i < count; i++) {
-      const person = new Person(completeLook({}, this.rnd), this.rnd);
-      person.root.visible = false;
-      scene.add(person.root);
-      this.list.push({ person, active: false, r: null, s: 0, dir: 1, side: 1, v: 1.3 + this.rnd() * 0.6, wait: this.rnd() * 3 });
-    }
-  }
-  spawn(w, px, pz) {
-    const r = this.world.randomRoadNear(px, pz, 35, 120, this.rnd, (q) => 'ERLSV'.includes(q.c));
-    if (!r) return;
-    w.r = r;
-    w.dir = this.rnd() < 0.5 ? 1 : -1;
-    w.s = this.rnd() * r.len;
-    w.side = this.rnd() < 0.5 ? 1 : -1;
-    w.active = true;
-    w.person.root.visible = true;
-  }
-  update(dt, player) {
-    const px = player.pos.x, pz = player.pos.z;
-    for (const w of this.list) {
-      if (!w.active) {
-        w.wait -= dt;
-        if (w.wait <= 0) {
-          this.spawn(w, px, pz);
-          w.wait = 1 + this.rnd() * 2;
-        }
-        continue;
-      }
-      w.s += w.dir * w.v * dt;
-      if (w.s < 0 || w.s > w.r.len) {
-        const j = w.s < 0 ? w.r.a : w.r.b;
-        const ex = this.world.exits(j, w.r).filter((e) => 'ERLSV'.includes(e.r.c));
-        if (!ex.length) w.dir = -w.dir;
-        else {
-          const e = ex[(this.rnd() * ex.length) | 0];
-          w.r = e.r;
-          w.dir = e.end === 0 ? 1 : -1;
-          w.s = e.end === 0 ? 0 : e.r.len;
-        }
-        w.s = clamp(w.s, 0, w.r.len);
-      }
-      const a = along(w.r.pts, w.s);
-      const off = (w.r.w / 2 + ('PSE'.includes(w.r.c) ? 1.3 : 0.6)) * w.side;
-      const x = a.x + a.dz * off, z = a.z - a.dx * off;
-      const d = Math.hypot(x - px, z - pz);
-      if (d > 130) {
-        w.active = false;
-        w.person.root.visible = false;
-        continue;
-      }
-      const yaw = Math.atan2(a.dx * w.dir, a.dz * w.dir);
-      const root = w.person.root;
-      root.position.set(x, 'PSE'.includes(w.r.c) ? 0.15 : 0, z);
-      root.rotation.y += angDiff(root.rotation.y, yaw) * (1 - Math.exp(-dt * 6));
-      w.person.update(dt, w.v, 'stand');
-      w.person.setShadows(d < 45);
-    }
-  }
-}
-
 // ---- traffic ----------------------------------------------------------------------
 
 export function buildModel(lib, fn) {
@@ -268,20 +201,20 @@ export class Traffic {
     this.world = world;
     this.rnd = mulberry32(4711);
     this.list = [];
-    const kinds = ['auto', 'scooter', 'car', 'scooter', 'auto', 'tempo', 'car', 'bus', 'scooter', 'auto', 'suv', 'scooter', 'car', 'auto', 'scooter', 'tempo', 'bus', 'scooter', 'auto', 'car', 'scooter', 'auto'];
+    // vehicles only: nothing here is dressed up as a person
+    const kinds = ['auto', 'car', 'auto', 'tempo', 'car', 'bus', 'auto', 'suv', 'car', 'auto', 'tempo', 'bus', 'auto', 'car', 'auto'];
     for (let i = 0; i < count; i++) {
       const kind = kinds[i % kinds.length];
       const group = buildModel(lib, (m) => {
         if (kind === 'auto') M.auto(m);
-        else if (kind === 'scooter') M.scooter(m, this.rnd, true);
         else if (kind === 'tempo') M.tempo(m, this.rnd);
         else if (kind === 'bus') M.bus(m, 'st');
         else M.car(m, this.rnd, kind === 'suv' ? 'suv' : undefined);
       });
       group.visible = false;
       scene.add(group);
-      const radius = kind === 'bus' ? 2.6 : kind === 'scooter' ? 0.7 : kind === 'auto' ? 1.2 : 1.5;
-      this.list.push({ group, kind, active: false, r: null, s: 0, dir: 1, v: 0, top: kind === 'bus' ? 8 : kind === 'scooter' ? 8 + this.rnd() * 5 : 7 + this.rnd() * 5, wait: this.rnd() * 4, x: 0, z: 0, yaw: 0, radius });
+      const radius = kind === 'bus' ? 2.6 : kind === 'auto' ? 1.2 : 1.5;
+      this.list.push({ group, kind, active: false, r: null, s: 0, dir: 1, v: 0, top: kind === 'bus' ? 8 : 7 + this.rnd() * 5, wait: this.rnd() * 4, x: 0, z: 0, yaw: 0, radius });
     }
   }
   ok(r, kind) {
@@ -333,7 +266,7 @@ export class Traffic {
       }
       const a = along(v.r.pts, v.s);
       // India drives on the left
-      const lane = Math.min(v.r.w / 4, 2.4) + (v.kind === 'scooter' ? 0.9 : 0);
+      const lane = Math.min(v.r.w / 4, 2.4);
       const ddx = a.dx * v.dir, ddz = a.dz * v.dir;
       v.x = a.x + ddz * lane;
       v.z = a.z - ddx * lane;
@@ -399,52 +332,6 @@ export class Strays {
       group.scale.y = 0.62; // curled up
       scene.add(group);
     });
-  }
-}
-
-// ---- evening walkers circling the lakes -------------------------------------------
-
-export class Walkers {
-  constructor(scene, loops, count) {
-    this.rnd = mulberry32(2024);
-    this.list = [];
-    const usable = loops.map((pts) => {
-      let len = 0;
-      const closed = pts.concat([pts[0]]);
-      for (let i = 1; i < closed.length; i++) len += Math.hypot(closed[i][0] - closed[i - 1][0], closed[i][1] - closed[i - 1][1]);
-      return { pts: closed, len };
-    }).filter((l) => l.len > 150);
-    if (!usable.length) return;
-    const total = usable.reduce((s, l) => s + l.len, 0);
-    for (let i = 0; i < count; i++) {
-      // longer tracks get more walkers
-      let pick = this.rnd() * total, loop = usable[0];
-      for (const l of usable) {
-        if ((pick -= l.len) <= 0) {
-          loop = l;
-          break;
-        }
-      }
-      const jog = this.rnd() < 0.25;
-      const person = new Person(completeLook(jog ? { garb: 'tee' } : {}, this.rnd), this.rnd);
-      scene.add(person.root);
-      this.list.push({ person, loop, s: this.rnd() * loop.len, dir: this.rnd() < 0.7 ? 1 : -1, v: jog ? 3.4 + this.rnd() : 1.2 + this.rnd() * 0.5, off: (this.rnd() - 0.5) * 3 });
-    }
-  }
-  update(dt, player) {
-    for (const w of this.list) {
-      w.s = (w.s + w.dir * w.v * dt + w.loop.len) % w.loop.len;
-      const a = along(w.loop.pts, w.s);
-      const x = a.x + a.dz * w.off, z = a.z - a.dx * w.off;
-      const d = Math.hypot(x - player.pos.x, z - player.pos.z);
-      const root = w.person.root;
-      root.visible = d < 150;
-      if (!root.visible) continue;
-      root.position.set(x, 0, z);
-      root.rotation.y = Math.atan2(a.dx * w.dir, a.dz * w.dir);
-      w.person.update(dt, w.v, 'stand');
-      w.person.setShadows(d < 45);
-    }
   }
 }
 
