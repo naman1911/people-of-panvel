@@ -125,14 +125,14 @@ function inviteCard() {
       save();
       const mail = emailFor(shown, link);
       const copyLink = h('button.quiet', { type: 'button', onclick: () => copy(link, copyLink) }, 'Copy link');
-      const copyMail = h('button.quiet', { type: 'button', onclick: () => copy(mail.body, copyMail) }, 'Copy the whole email');
+      const copyMail = h('button.quiet', { type: 'button', onclick: () => copy(mail.body, copyMail) }, 'Copy the whole message');
       out.replaceChildren(
         h('p.ok', `✓ Invite ready for ${shown}. Member id ${inv.mid}.`),
         h('label', 'THEIR PERSONAL LINK'),
         h('textarea', { rows: 4, readOnly: true }, link),
         h('a.btn.gold', { href: `mailto:${email.value.trim().replace(/[^\w.+@-]/g, '')}?subject=${encodeURIComponent(mail.subject)}&body=${encodeURIComponent(mail.body)}` }, 'Open email to send it'),
         copyLink, copyMail,
-        h('p.muted', 'The link is shown only now. If it is lost, make a new invite for the same person.'));
+        h('p.muted', 'To send it by Instagram DM, copy the link or the whole message and paste it into the chat. The link is shown only now. If it is lost, make a new invite for the same person.'));
       name.value = '';
       email.value = '';
       drawPeople();

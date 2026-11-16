@@ -13,9 +13,9 @@ export const CONFIG = {
     reviewers: [
       'BJ1rknG1MaDmqLPZxK0vPZX7E7uANe6TFctl_keHOMyS3xpgp4v1oAT8SVNgsPKl7jt9QmD1L4irmhonr6_3w54',
     ],
-    // Where "Ask for an invite" sends people. An email address, or leave it empty and give a form link below.
+    // Where "Ask for an invite" sends people: a link (here, the Instagram page people follow and DM), or an email address.
     requestEmail: '',
-    requestUrl: '',
+    requestUrl: 'https://www.instagram.com/peopleofpanvel/',
     // Member ids (eight letters and digits, shown on the reviewer page) whose invites are withdrawn.
     revoked: [],
   },

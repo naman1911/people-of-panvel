@@ -355,7 +355,7 @@ export function createUI(game) {
       h('hr.perf'),
       h('div.row', { style: { marginTop: 0 } },
         h('button.link', { type: 'button', onclick: () => { if (confirm(t('hide_sure', { name: q.name }))) { live.block(q.mid); ui.close(); ui.toast(t('hidden')); } } }, t('hide')),
-        report ? h('a.link', { href: report }, t('report')) : null));
+        report ? h('a.link', { href: report, target: '_blank', rel: 'noopener' }, t('report')) : null));
   };
 
   /** The whole town. Tap a place to walk there, a rickshaw or a person to ride there. */
@@ -418,8 +418,9 @@ export function createUI(game) {
       h('div.row', h('span'), go),
       h('hr.perf'),
       h('div.k', t('no_code')),
-      h('p.small', t(game.canAsk() ? 'ask_sub' : 'ask_closed')),
-      game.canAsk() ? [
+      h('p.small', t(game.askLink() ? 'ask_follow' : game.canAsk() ? 'ask_sub' : 'ask_closed')),
+      game.askLink() ? h('div.row', h('span'), h('a.btn.btn--gold', { href: game.askLink(), target: '_blank', rel: 'noopener' }, t('ask_open'), ' ▸'))
+      : game.canAsk() ? [
         h('label.field', h('span', t('ask_name')), name),
         h('label.field', h('span', t('ask_why')), why),
         h('div.row', h('span.small', t('ask_note')), h('button.btn.btn--ghost', { type: 'button', onclick: () => {

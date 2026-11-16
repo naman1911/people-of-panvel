@@ -303,13 +303,16 @@ async function start() {
       ui.toast(t('left'));
     },
     canAsk: () => !!(CONFIG.invite.requestUrl || CONFIG.invite.requestEmail),
+    /** The page where invites are asked for (people follow it and send a message), if there is one. */
+    askLink: () => CONFIG.invite.requestUrl || null,
     askUrl(name, why) {
       if (CONFIG.invite.requestUrl) return CONFIG.invite.requestUrl;
       const body = `Namaskar,\n\nI would like an invite to People of Panvel.\n\nName: ${name}\nAbout me and Panvel: ${why}\n`;
       return `mailto:${CONFIG.invite.requestEmail}?subject=${encodeURIComponent('Invite request: ' + name)}&body=${encodeURIComponent(body)}`;
     },
     reportUrl(q) {
-      if (!CONFIG.invite.requestEmail) return null;
+      // with no email address for requests, reports go the same way invites are asked for
+      if (!CONFIG.invite.requestEmail) return CONFIG.invite.requestUrl || null;
       const said = live.log.filter((m) => m.mid === q.mid && !m.mine).slice(-12).map((m) => `[${new Date(m.at).toLocaleTimeString()}] (${m.scope === 'dm' ? 'private' : m.scope === 'town' ? 'everyone' : 'nearby'}) ${m.text}`).join('\n');
       const body = `Member: ${q.name}\nMember id: ${q.mid}\nWhen: ${new Date().toISOString()}\n\nWhat happened:\n\n\nWhat they said to me recently:\n${said || '(nothing in this visit)'}\n`;
       return `mailto:${CONFIG.invite.requestEmail}?subject=${encodeURIComponent('Report: ' + q.name)}&body=${encodeURIComponent(body)}`;

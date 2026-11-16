@@ -11,7 +11,7 @@ It runs entirely in the browser. There is no build step, no server and no accoun
 ## How it works for a visitor
 
 - **Everyone arrives as a ghost.** A ghost can walk anywhere, sees the members who are in town, and hears what they say nearby. Nobody sees a ghost, and a ghost cannot talk.
-- **Members come in by invite.** A reviewer emails each person a link that is theirs alone. One tap on it and they walk in under their own name.
+- **Members come in by invite.** Follow @peopleofpanvel on Instagram and send a DM. A reviewer sends back a link that is yours alone. One tap on it and you walk in under your own name.
 - **Members see and hear each other.** A member's name floats above their head. What a member types is heard by people within about 60 metres, as a line on screen and a bubble over the speaker.
 - **Three ways to talk.** The button beside the typing bar chooses who hears you: people nearby, everyone in Panvel, or one person privately. Tap a member and choose **Message privately** to start a private conversation.
 - **Meeting is one tap.** The pill at the top shows who is in town. Pick someone and a rickshaw takes you to them. Two members who come face to face fold their hands in a namaskar.
@@ -77,7 +77,7 @@ There is no server to keep a list of members, so membership is carried by signat
 
 The page keeps a list of who was invited, in that browser only.
 
-Requests reach the reviewer through `invite.requestEmail` (or `invite.requestUrl` for a form) in `js/config.js`. That is where **Ask for an invite** sends a ghost. Leave both empty and the button is not shown.
+People ask for an invite by following [@peopleofpanvel](https://www.instagram.com/peopleofpanvel/) on Instagram and sending a DM. The reviewer makes their link and pastes it into the DM. The site's **Come in** panel says so and links there; the address is `invite.requestUrl` in `js/config.js` (an email address in `invite.requestEmail` works too).
 
 ## What is sent, and to whom
 
