@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { params, mulberry32, hashStr, clamp, h, isTouch } from './util.js';
 import { store } from './store.js';
-import { t, getLang } from './i18n.js';
+import { t, en } from './i18n.js';
 import { createRenderer, pickTier } from './gfx/renderer.js';
 import { buildMaterials } from './gfx/materials.js';
 import { Atmosphere } from './gfx/sky.js';
@@ -54,7 +54,7 @@ async function start() {
   const camera = new THREE.PerspectiveCamera(56, window.innerWidth / window.innerHeight, 0.3, R.tier.far);
   camera.layers.enable(1); // layer 1: small detail the lake mirror skips
 
-  say(t('loading'));
+  say(en('loading'));
   // Signboards are painted with these fonts; if the network is slow, carry on with system fonts.
   await Promise.race([
     Promise.all([

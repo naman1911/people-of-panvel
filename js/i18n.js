@@ -140,7 +140,9 @@ const S = {
   how_touch: { en: 'Left thumb walks, right thumb looks. Tap the round map to see the whole town.', mr: 'डावा अंगठा चालतो, उजवा बघतो. पूर्ण गाव बघायला गोल नकाशावर टॅप करा.' },
 };
 
-let lang = store.get('lang') || ((navigator.language || 'en').startsWith('mr') ? 'mr' : 'en');
+// English unless the visitor picks Marathi in the menu. The Marathi wording has not been checked by a
+// native reader yet, so it is never chosen for anyone automatically.
+let lang = store.get('lang') === 'mr' ? 'mr' : 'en';
 const listeners = new Set();
 
 export const getLang = () => lang;
@@ -156,6 +158,12 @@ export const onLang = (fn) => (listeners.add(fn), () => listeners.delete(fn));
 export function t(key, vars) {
   const e = S[key];
   let s = e ? e[lang] || e.en : key;
+  if (vars) for (const k in vars) s = s.replace('{' + k + '}', vars[k]);
+  return s;
+}
+/** The English wording, whatever language is chosen. Used on the first screen, which is kept in English. */
+export function en(key, vars) {
+  let s = S[key] ? S[key].en : key;
   if (vars) for (const k in vars) s = s.replace('{' + k + '}', vars[k]);
   return s;
 }

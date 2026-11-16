@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import { h, isTouch } from './util.js';
-import { t, L, getLang, setLang, onLang } from './i18n.js';
+import { t, en, L, getLang, setLang, onLang } from './i18n.js';
 import { store } from './store.js';
 import { HUBS } from './data/places.js';
 import { SKIN } from './entities/person.js';
@@ -43,14 +43,14 @@ export function createUI(game) {
       introEl?.remove();
       const m = game.member();
       introEl = h('div.intro',
-        h('div.intro-top', h('span'), langToggle()),
+        // the first screen is in English only; language is chosen later, in the menu
+        h('div.intro-top'),
         h('div',
           h('div.intro-kicker', 'PEOPLE OF'),
           h('h1', 'PANVEL'),
-          h('div.intro-mr', 'पनवेलची माणसं'),
-          h('p.intro-line', t('tagline')),
-          h('p.intro-sub', m ? t('intro_member', { name: m.name }) : t('intro_ghost')),
-          h('button.btn', { type: 'button', onclick: () => { sfx.unlock(); sfx.chime(); introEl.remove(); introEl = null; onEnter(); } }, t('enter'))));
+          h('p.intro-line', en('tagline')),
+          h('p.intro-sub', m ? en('intro_member', { name: m.name }) : en('intro_ghost')),
+          h('button.btn', { type: 'button', onclick: () => { sfx.unlock(); sfx.chime(); introEl.remove(); introEl = null; onEnter(); } }, en('enter'))));
       root.append(introEl);
     };
     draw();

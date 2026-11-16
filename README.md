@@ -1,4 +1,4 @@
-# People of Panvel · पनवेलची माणसं
+# People of Panvel
 
 A Panvel you can walk through, built from the town's real streets and buildings, where the people you meet are real.
 
