@@ -4,8 +4,10 @@
 
 import { newReviewer, reviewerPublic, writeInvite, openInvite } from './net/invite.js';
 import { cleanName } from './net/safety.js';
-import { CONFIG } from './config.js';
 import { h } from './util.js';
+
+// Always read the site settings fresh, so this page knows at once when the reviewer's key has been added.
+const { CONFIG } = await import('./config.js?t=' + Date.now());
 
 const KEY = 'people-of-panvel:reviewer';
 const SITE = location.origin + location.pathname.replace(/[^/]*$/, '');
@@ -88,7 +90,7 @@ function keyCard() {
     h('h2', 'Your reviewer key'),
     installed
       ? h('p.ok', '✓ The site knows this key. Invites you make here will work.')
-      : h('p.warn', '⚠ The site does not know this key yet. Invites you make will not work until the public key below is added to the site.'),
+      : h('p.warn', '⚠ The site does not know this key yet. Invites you make will not work until the public key below is added to the site settings. It is not an invite code: do not paste it into the site.'),
     h('label', 'PUBLIC KEY (SAFE TO SHARE)'),
     h('textarea', { rows: 2, readOnly: true }, pub),
     copyBtn,

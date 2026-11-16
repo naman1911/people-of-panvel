@@ -338,6 +338,8 @@ export function createUI(game) {
     const err = h('p.small.err');
     const go = h('button.btn', { type: 'button', onclick: async () => {
       if (!code.value.trim()) return code.focus();
+      // a reviewer's public key is not an invite; say so plainly
+      if (/^B[A-Za-z0-9_-]{86}$/.test(code.value.replace(/\s+/g, ''))) return void (err.textContent = t('code_pubkey'));
       go.disabled = true;
       err.textContent = '';
       try {

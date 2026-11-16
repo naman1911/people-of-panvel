@@ -10,7 +10,9 @@ export const CONFIG = {
    */
   invite: {
     // Public keys of the reviewers. An invite only works if one of these people made it.
-    reviewers: [],
+    reviewers: [
+      'BJ1rknG1MaDmqLPZxK0vPZX7E7uANe6TFctl_keHOMyS3xpgp4v1oAT8SVNgsPKl7jt9QmD1L4irmhonr6_3w54',
+    ],
     // Where "Ask for an invite" sends people. An email address, or leave it empty and give a form link below.
     requestEmail: '',
     requestUrl: '',

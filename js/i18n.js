@@ -48,6 +48,7 @@ const S = {
   have_code: { en: 'I HAVE AN INVITE CODE', mr: 'माझ्याकडे आमंत्रण कोड आहे' },
   code_ph: { en: 'Paste the code or the link from your email', mr: 'ईमेलमधला कोड किंवा लिंक इथे चिकटवा' },
   code_shape: { en: 'That does not look like an invite code. Copy the whole code or link from the email.', mr: 'हा आमंत्रण कोड वाटत नाही. ईमेलमधला पूर्ण कोड किंवा लिंक कॉपी करा.' },
+  code_pubkey: { en: 'That is a reviewer key, not an invite code. Invites are made on the reviewer page and arrive by email.', mr: 'ही परीक्षकाची की आहे, आमंत्रण कोड नाही. आमंत्रणं परीक्षकाच्या पानावर बनतात आणि ईमेलने येतात.' },
   code_unknown: { en: 'This code was not made by a reviewer of this town.', mr: 'हा कोड या गावाच्या परीक्षकाने दिलेला नाही.' },
   code_revoked: { en: 'This invite has been withdrawn.', mr: 'हे आमंत्रण मागे घेतलं आहे.' },
   link_bad: { en: 'That invite link did not work. Ask the reviewer for a new one.', mr: 'ती आमंत्रण लिंक चालली नाही. परीक्षकाकडून नवी मागा.' },
