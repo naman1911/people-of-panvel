@@ -9,7 +9,7 @@ const defaults = () => ({
   quality: null,
   invite: null, // the member's invite code, once they have used one here
   look: null, // how the member's character looks
-  rulesOk: false, // has read what being a member means
+  rulesOk: 0, // which version of "what being a member means" this visitor has agreed to
   blocked: [], // member ids this visitor has hidden
   hinted: false, // has seen the one-line "how to move" hint
 });

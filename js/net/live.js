@@ -14,24 +14,27 @@
 //   - nothing is stored: when you leave, you are gone, and so is the talk;
 //   - a member's pass is signed by a reviewer and everything they announce or
 //     say is signed with their own key, so nobody can pose as a member or put
-//     words in a member's mouth. Movement between announcements is not signed.
+//     words in a member's mouth. Movement between announcements is not signed;
+//   - a private message can be read by the two people in it and by the
+//     reviewers, and by nobody else. Members are told before they walk in that
+//     messages are not secret and can be checked.
 //
 // Topics (all under PREFIX):
 //   b/<sid>         announcement: session, pass, look and rough position, every few seconds, signed
 //   m/<cell>/<sid>  movement, a few times a second, only to nearby cells
 //   c/<cell>        things said out loud to people nearby, signed
+//   t               things said to everyone in town, signed (members only listen here)
+//   d/<sid>         a private message for <sid>: sealed for them and for the reviewers, signed
 //   x/<sid>         goodbye, or the relay's notice that <sid> dropped off
 
 import { Mqtt } from './mqtt.js';
 import { cleanText, soften, cleanName, cleanLook, finite, Bucket } from './safety.js';
-import { checkPass, signText, checkText } from './invite.js';
+import { checkPass, signText, checkText, sharedKey, reviewerDh, seal, unseal } from './invite.js';
+import { PREFIX, RELAYS, CELL, HEAR } from './wire.js';
 import { store } from '../store.js';
 import { params } from '../util.js';
 
-const PREFIX = 'pop2';
-const RELAYS = ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt'];
-const CELL = 300; // metres; you get movement and speech from your cell and its neighbours
-export const HEAR = 60; // metres: how far a spoken message carries
+export { HEAR };
 const MAX_PEERS = 160;
 const SKEW = 10 * 60000; // clocks on two phones may disagree by this much
 
@@ -52,7 +55,7 @@ export class Live {
     this.sid = null;
     this.peers = new Map(); // sid -> member we can see
     this.cells = new Set();
-    this.log = []; // what has been said nearby
+    this.log = []; // what has been said: nearby, to the whole town, and privately
     this.on = {}; // callbacks: status, peers, chat, displaced
     this.mq = null;
     this.attempt = 0;
@@ -128,6 +131,8 @@ export class Live {
     this.mq = mq;
     this.attempt = 0;
     mq.subscribe([`${PREFIX}/b/+`, `${PREFIX}/x/+`]);
+    // the town-wide room and private messages are for members
+    if (this.sid) mq.subscribe([`${PREFIX}/t`, `${PREFIX}/d/${this.sid}`]);
     this.cells.clear();
     this._cells();
     this._state('on');
@@ -228,17 +233,41 @@ export class Live {
     }
   }
 
-  /** Say something to the people around you. Returns false if it could not be sent. */
-  say(text) {
+  /**
+   * Say something. scope: 'near' (people within earshot), 'town' (every member in Panvel),
+   * or 'dm' (one member, by member id). Returns false if it could not be sent; `sayError`
+   * then says why: 'slow' or 'gone'.
+   */
+  say(text, scope = 'near', toMid) {
     if (!this.speaking) return false;
     const now = Date.now();
+    this.sayError = 'slow';
     if (now - this.lastSay < 1200) return false;
     const t = cleanText(text, 200);
     if (!t) return false;
+    const mine = { sid: this.sid, mid: this.member.mid, name: this.member.name, text: t, mine: true };
+    if (scope === 'dm') {
+      const p = [...this.peers.values()].find((q) => q.mid === toMid);
+      this.sayError = 'gone';
+      if (!p) return false;
+      this.lastSay = now;
+      this._whisper(p, t, now).catch(() => {});
+      this._log({ ...mine, scope: 'dm', with: p.mid, withName: p.name });
+      return true;
+    }
     this.lastSay = now;
-    this._send('c/' + this.cell, JSON.stringify({ i: this.sid, t, ts: now }));
-    this._log({ sid: this.sid, mid: this.member.mid, name: this.member.name, text: t, mine: true });
+    this._send(scope === 'town' ? 't' : 'c/' + this.cell, JSON.stringify({ i: this.sid, t, ts: now }));
+    this._log({ ...mine, scope: scope === 'town' ? 'town' : 'near' });
     return true;
+  }
+
+  /** A private message: sealed once for the person, and once for each reviewer. */
+  async _whisper(p, text, ts) {
+    p.aes ||= await sharedKey(this.member.dhKey, p.dh);
+    this.forReviewers ||= Promise.all(this.reviewers.map((pub) => reviewerDh(pub).then((dh) => sharedKey(this.member.dhKey, dh)).catch(() => null)));
+    const keys = await this.forReviewers;
+    const body = { i: this.sid, to: p.sid, ts, m: await seal(p.aes, text), r: await Promise.all(keys.map((k) => (k ? seal(k, text) : null))) };
+    await this._send('d/' + p.sid, JSON.stringify(body));
   }
 
   _log(msg) {
@@ -257,7 +286,9 @@ export class Live {
     if (kind === 'm') return this._onMove(parts[3], text);
     if (kind === 'b') return void this._onBeacon(parts[2], text).catch(() => {});
     if (kind === 'x') return this._onGone(parts[2]);
-    if (kind === 'c') return void this._onSay(text).catch(() => {});
+    if (kind === 'c') return void this._onSay(text, 'near').catch(() => {});
+    if (kind === 't') return void this._onSay(text, 'town').catch(() => {});
+    if (kind === 'd') return void this._onWhisper(parts[2], text).catch(() => {});
   }
 
   async _onBeacon(sid, text) {
@@ -312,6 +343,7 @@ export class Live {
       this.peers.set(sid, p);
     }
     p.key = who.key;
+    p.dh = who.dh;
     p.name = cleanName(who.name);
     p.issued = who.issued;
     p.since = since;
@@ -345,7 +377,7 @@ export class Live {
     if (this.peers.delete(sid)) this.emit('peers');
   }
 
-  async _onSay(text) {
+  async _onSay(text, scope) {
     const cut = split(text);
     if (!cut) return;
     const [body, sig] = cut;
@@ -362,15 +394,41 @@ export class Live {
     if (!p || !this.bucket.take('c' + sid)) return;
     const now = Date.now(), ts = finite(d.ts, 0, 9e15);
     if (Math.abs(now - ts) > SKEW || ts <= p.sayT) return;
-    if (Math.hypot(p.tx - this.pos.x, p.tz - this.pos.z) > HEAR) return;
+    if (scope === 'near' && Math.hypot(p.tx - this.pos.x, p.tz - this.pos.z) > HEAR) return;
     if (!(await checkText(p.key, body, sig))) return;
     if (ts <= p.sayT || this.blocked(p.mid)) return;
     p.sayT = ts;
     const out = soften(d.t, 200);
     if (!out) return;
-    p.say = out;
-    p.sayUntil = now + 6500;
-    this._log({ sid, mid: p.mid, name: p.name, text: out });
+    if (scope === 'near') {
+      p.say = out;
+      p.sayUntil = now + 6500;
+    }
+    this._log({ scope, sid, mid: p.mid, name: p.name, text: out });
+  }
+
+  async _onWhisper(toSid, text) {
+    if (!this.member || toSid !== this.sid) return;
+    const cut = split(text);
+    if (!cut) return;
+    const [body, sig] = cut;
+    let d;
+    try {
+      d = JSON.parse(body);
+    } catch {
+      return;
+    }
+    if (!d || typeof d !== 'object' || d.to !== this.sid || !d.m || typeof d.m.iv !== 'string' || typeof d.m.c !== 'string') return;
+    const p = this.peers.get(String(d.i || ''));
+    if (!p || this.blocked(p.mid) || !this.bucket.take('d' + p.sid)) return;
+    const now = Date.now(), ts = finite(d.ts, 0, 9e15);
+    if (Math.abs(now - ts) > SKEW || ts <= (p.dmT || 0)) return;
+    if (!(await checkText(p.key, body, sig))) return;
+    if (ts <= (p.dmT || 0)) return;
+    p.dmT = ts;
+    p.aes ||= await sharedKey(this.member.dhKey, p.dh);
+    const out = soften(await unseal(p.aes, d.m), 200);
+    if (out) this._log({ scope: 'dm', with: p.mid, withName: p.name, sid: p.sid, mid: p.mid, name: p.name, text: out });
   }
 
   // ---- hiding people ---------------------------------------------------------------------
@@ -378,7 +436,7 @@ export class Live {
   block(mid) {
     store.add('blocked', mid);
     for (const [sid, p] of this.peers) if (p.mid === mid) this.peers.delete(sid);
-    this.log = this.log.filter((m) => m.mid !== mid);
+    this.log = this.log.filter((m) => m.mid !== mid && m.with !== mid);
     this.emit('peers');
   }
 

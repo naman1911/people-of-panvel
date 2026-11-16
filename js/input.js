@@ -11,6 +11,7 @@ export class Input {
     this.stick = { x: 0, y: 0 };
     this.run = false;
     this.onPress = null; // (code) => void
+    this.onTap = null; // (x, y) => void: a click or touch that did not drag
     this.enabled = true;
     this.dragging = false;
     this.touchLook = null;
@@ -40,6 +41,7 @@ export class Input {
       this.dragging = true;
       this.lastX = e.clientX;
       this.lastY = e.clientY;
+      this.press = { x: e.clientX, y: e.clientY, at: performance.now() };
       canvas.focus();
       // In first person a click captures the mouse, so you look around just by moving it.
       if (this.wantLock?.() && document.pointerLockElement !== canvas) canvas.requestPointerLock?.()?.catch?.(() => {});
@@ -60,7 +62,13 @@ export class Input {
       this.lastX = e.clientX;
       this.lastY = e.clientY;
     });
-    window.addEventListener('mouseup', () => (this.dragging = false));
+    window.addEventListener('mouseup', (e) => {
+      this.dragging = false;
+      // a quick click that did not drag: "go there"
+      const p = this.press;
+      this.press = null;
+      if (p && !this.locked && e.target === canvas && performance.now() - p.at < 350 && Math.hypot(e.clientX - p.x, e.clientY - p.y) < 6) this.onTap?.(e.clientX, e.clientY);
+    });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
@@ -71,10 +79,10 @@ export class Input {
     const tstart = (e) => {
       for (const t of e.changedTouches) {
         if (t.clientX < window.innerWidth * 0.45 && !this.touchMove) {
-          this.touchMove = { id: t.identifier, ox: t.clientX, oy: t.clientY };
+          this.touchMove = { id: t.identifier, ox: t.clientX, oy: t.clientY, at: performance.now(), far: 0 };
           this.onStick?.(t.clientX, t.clientY, 0, 0, true);
         } else if (!this.touchLook) {
-          this.touchLook = { id: t.identifier, x: t.clientX, y: t.clientY };
+          this.touchLook = { id: t.identifier, x: t.clientX, y: t.clientY, ox: t.clientX, oy: t.clientY, at: performance.now(), far: 0 };
         }
       }
       e.preventDefault();
@@ -84,12 +92,14 @@ export class Input {
         if (this.touchMove && t.identifier === this.touchMove.id) {
           const dx = t.clientX - this.touchMove.ox, dy = t.clientY - this.touchMove.oy;
           const d = Math.hypot(dx, dy), max = 52;
+          this.touchMove.far = Math.max(this.touchMove.far, d);
           const k = d > max ? max / d : 1;
           this.stick.x = (dx * k) / max;
           this.stick.y = (-dy * k) / max;
           this.run = d > max * 1.5;
           this.onStick?.(this.touchMove.ox, this.touchMove.oy, dx * k, dy * k, true);
         } else if (this.touchLook && t.identifier === this.touchLook.id) {
+          this.touchLook.far = Math.max(this.touchLook.far, Math.hypot(t.clientX - this.touchLook.ox, t.clientY - this.touchLook.oy));
           this.lookX += (t.clientX - this.touchLook.x) * 1.4;
           this.lookY += (t.clientY - this.touchLook.y) * 1.4;
           this.touchLook.x = t.clientX;
@@ -99,14 +109,20 @@ export class Input {
       e.preventDefault();
     };
     const tend = (e) => {
+      const now = performance.now();
+      const tapped = (rec, t) => e.type === 'touchend' && now - rec.at < 350 && rec.far < 10 && this.onTap?.(t.clientX, t.clientY);
       for (const t of e.changedTouches) {
         if (this.touchMove && t.identifier === this.touchMove.id) {
+          tapped(this.touchMove, t);
           this.touchMove = null;
           this.stick.x = this.stick.y = 0;
           this.run = false;
           this.onStick?.(0, 0, 0, 0, false);
         }
-        if (this.touchLook && t.identifier === this.touchLook.id) this.touchLook = null;
+        if (this.touchLook && t.identifier === this.touchLook.id) {
+          tapped(this.touchLook, t);
+          this.touchLook = null;
+        }
       }
     };
     canvas.addEventListener('touchstart', tstart, { passive: false });

@@ -13,8 +13,9 @@ It runs entirely in the browser. There is no build step, no server and no accoun
 - **Everyone arrives as a ghost.** A ghost can walk anywhere, sees the members who are in town, and hears what they say nearby. Nobody sees a ghost, and a ghost cannot talk.
 - **Members come in by invite.** A reviewer emails each person a link that is theirs alone. One tap on it and they walk in under their own name.
 - **Members see and hear each other.** A member's name floats above their head. What a member types is heard by people within about 60 metres, as a line on screen and a bubble over the speaker.
+- **Three ways to talk.** The button beside the typing bar chooses who hears you: people nearby, everyone in Panvel, or one person privately. Tap a member and choose **Message privately** to start a private conversation.
 - **Meeting is one tap.** The pill at the top shows who is in town. Pick someone and a rickshaw takes you to them. Two members who come face to face fold their hands in a namaskar.
-- **Getting around.** Walk with the left thumb or `W` `A` `S` `D`. Tap the round map, then tap anywhere on the big map to be walked there, or tap a rickshaw stand to ride there.
+- **Getting around.** Tap or click a spot on the ground and your character walks there. Or walk with the left thumb or `W` `A` `S` `D`. Tap the round map, then tap anywhere on the big map to be walked there, or tap a rickshaw stand to ride there. A picture of all this is shown on the first visit, and again from the menu.
 
 Nothing else is on screen: the name of the place you are in, who is around, a place to type, and the map.
 
@@ -46,14 +47,15 @@ Before publishing a change, run `node tools/stamp.mjs`. It gives every script an
 | --- | --- |
 | `W` `A` `S` `D` | Walk |
 | `Shift` | Run |
+| Click on the ground | Walk there |
 | Mouse | Look around (click once to capture the mouse, `Esc` to release) |
-| `Enter` | Type something to people nearby (members) |
+| `Enter` | Type something (members) |
 | `M` | The map |
 | `P` | Who is in town |
 | `E` | Open the card of the member in front of you |
 | `V` | See through your own eyes, or from behind |
 
-On a phone, the left thumb walks and the right thumb looks. The ☰ menu holds language, view, sound and graphics.
+On a phone, the left thumb walks on the joystick, the right thumb looks, and a tap on the ground walks you there. The ☰ menu holds language, view, sound and graphics.
 
 ## Invites
 
@@ -71,6 +73,7 @@ There is no server to keep a list of members, so membership is carried by signat
 1. Open `/reviewer.html` and press **Make my reviewer key**. Download the key backup and keep it private.
 2. Copy the public key shown there into `invite.reviewers` in `js/config.js`. The page says when the site knows the key.
 3. For each person: type their name as it should appear, their email, and press **Make invite**. **Open email to send it** opens a ready-written email with their link.
+4. To see what is being said, press **Start watching** under **Watch the town**. Nearby talk, messages to everyone and private messages all appear there as they are said, with who wrote to whom. The record can be downloaded.
 
 The page keeps a list of who was invited, in that browser only.
 
@@ -81,8 +84,9 @@ Requests reach the reviewer through `invite.requestEmail` (or `invite.requestUrl
 Browsers meet on a public MQTT relay (`broker.emqx.io`, with `broker.hivemq.com` as a fallback, set in `js/net/live.js`).
 
 - A **ghost** connects only to listen. It sends nothing about itself.
-- A **member's** name, look, position and messages pass through the relay in the clear. Anyone connected to the relay can read them, ghosts included. It is a public square, not a private room.
-- Nothing is stored. When a member leaves, they and their words are gone.
+- A **member's** name, look and position, and what they say nearby or to everyone, pass through the relay in the clear. Anyone connected to the relay can read them. It is a public square, not a private room.
+- A **private message** is sealed twice: once for the person it is sent to, and once for each reviewer. Other members and outsiders cannot read it. Reviewers can, on the reviewer page, so that harassment can be dealt with. Before walking in, every member is told that nothing they write is secret and that messages can be checked for safety.
+- Nothing is stored on the internet. A reviewer sees only what is said while their page is open and watching, and that record stays in their browser. When no reviewer is watching, messages are gone once they are read.
 - Movement between announcements is not signed. Someone with their own software could make a member appear to jump about. They could not speak as that member.
 - Incoming text is filtered for abuse, links and phone numbers, and floods are rate-limited. A member can hide any other member on their own device, and report them to the reviewer by email.
 
@@ -112,8 +116,8 @@ The script projects the data to metres around the ST depot, splits streets into 
 ## Not built yet
 
 - Meeting offline. The site is the first step: people who feel they belong to the same town.
-- Private conversations between two members.
-- Anything that needs a server: accounts, a shared list of members, messages that are still there tomorrow.
+- A record of messages while no reviewer is watching. That needs somewhere on the internet to keep them.
+- Anything else that needs a server: accounts, a shared list of members, messages that are still there tomorrow.
 
 Earlier versions had fictional residents, computer-run passers-by, landmark stamps, drivable rickshaws, tea-stall circles, gestures and street games. They were removed to keep the site about roaming and real people. They remain in the git history.
 
@@ -129,7 +133,7 @@ tools/stamp.mjs       stamps a release so browsers never mix old and new files
 js/main.js            game loop
 js/config.js          site settings: reviewers, where requests go, imagery key
 js/ui.js              interface
-js/net/               the live layer: relay client, invites and signatures, input safety
+js/net/               the live layer: relay client, invites, signatures and sealed messages, input safety
 js/gfx/               renderer, sky, procedural textures and materials
 js/world/             town builder: streets, rail, buildings, props, landmarks, names, imagery
 js/entities/          player, camera, passers-by, traffic, members seen live

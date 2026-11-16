@@ -140,7 +140,7 @@ export class Mqtt {
         const topic = dec.decode(body.subarray(2, p));
         if (flags & 6) p += 2; // packet id, only present above QoS 0
         // payloads are capped: nobody needs more than this to say hello
-        if (len - p <= 1400) this.onMessage?.(topic, dec.decode(body.subarray(p)));
+        if (len - p <= 4096) this.onMessage?.(topic, dec.decode(body.subarray(p)));
       } else onControl?.(type, body);
       o = i + len;
     }

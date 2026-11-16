@@ -31,6 +31,13 @@
     th { text-align: left; font: 600 11px "Baloo 2", sans-serif; letter-spacing: 1.4px; color: var(--muted); padding: 4px 6px; }
     td { padding: 6px; border-top: 1px solid var(--line); vertical-align: top; word-break: break-word; }
     td code { font-size: 13px; }
+    .feed { max-height: 52vh; overflow-y: auto; background: #0b1b20; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-top: 10px; font-size: 14.5px; }
+    .feed .msg { padding: 5px 0; border-top: 1px solid rgba(251, 241, 220, .08); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; word-break: break-word; }
+    .feed .msg:first-child { border-top: 0; }
+    .feed .when { color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .feed .tag { font: 600 11px "Baloo 2", sans-serif; letter-spacing: 1px; text-transform: uppercase; padding: 1px 7px 0; border-radius: 6px; background: rgba(251, 241, 220, .1); white-space: nowrap; }
+    .feed .tag.private { background: rgba(242, 194, 26, .22); color: var(--board); }
+    .feed .tag.everyone { background: rgba(61, 220, 132, .16); color: var(--green); }
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -40,6 +47,6 @@
     <p class="muted">This page makes the personal invite codes that let people into Panvel. Everything happens in this browser. Nothing is sent anywhere.</p>
     <noscript><p class="warn">This page needs JavaScript.</p></noscript>
   </main>
-  <script type="module" src="js/reviewer.js?v=8"></script>
+  <script type="module" src="js/reviewer.js?v=9"></script>
 </body>
 </html>

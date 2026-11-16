@@ -87,6 +87,21 @@ button.pill:hover{background:var(--ink-3)}
 .sayform{display:flex;gap:6px}
 .sayform .input{flex:1;background:rgba(11,27,32,.9);border-radius:12px;border:1px solid var(--line);border-bottom:2px solid var(--accent);min-width:0}
 .sayform .btn{padding:8px 15px 6px;border-radius:12px}
+.scope{flex:none;display:flex;align-items:center;gap:3px;background:rgba(11,27,32,.9);border:1px solid var(--line);border-radius:12px;padding:0 10px;font-size:17px;line-height:1}
+.scope span{font-size:10px;color:var(--muted)}
+.scopemenu{background:rgba(16,37,43,.97);border:1px solid var(--line);border-radius:14px;padding:6px 8px 8px;display:flex;flex-direction:column;gap:4px;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+.scopemenu button{display:flex;align-items:center;gap:10px;text-align:left;padding:8px 10px;border-radius:10px;background:rgba(251,241,220,.05)}
+.scopemenu button.on{background:rgba(242,194,26,.2);box-shadow:inset 0 0 0 1px var(--board)}
+.scopemenu button b{flex:1;font-size:15px}
+.scopemenu button span:last-child{font-size:12.5px;color:var(--muted)}
+.scopemenu .ic{font-size:18px}
+.scopemenu .k{margin:4px 4px 2px}
+.scopemenu .small{margin:4px 4px 0}
+.saynote{align-self:flex-start;font-size:12px;font-weight:600;color:var(--board);background:rgba(16,37,43,.86);padding:3px 10px 2px;border-radius:8px}
+.sayline .ic{margin-right:6px}
+.sayline--dm{border-color:rgba(242,194,26,.65)}
+.sayline--town{border-color:rgba(61,220,132,.5)}
+.say.open .sayline{cursor:pointer}
 .ghostbar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(16,37,43,.9);border:1px solid var(--line);border-radius:14px;padding:8px 10px 8px 14px;font-size:14px;font-weight:600}
 .ghostbar .btn{flex:none}
 .code{resize:none;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.35;word-break:break-all}
@@ -166,6 +181,17 @@ button.item:hover{border-color:rgba(255,182,39,.55);background:rgba(255,182,39,.
 .rules{margin:10px 0;padding:0;list-style:none}
 .rules li{background:rgba(251,241,220,.05);border-left:4px solid var(--gold);border-radius:0 10px 10px 0;padding:8px 12px;margin:6px 0;font-size:14.5px}
 
+/* how to move: a plain picture, shown once */
+.coach{position:fixed;inset:0;z-index:60;background:rgba(10,24,28,.82);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;text-align:center;cursor:pointer;animation:fadein .25s}
+.coach-title{font-family:var(--display);font-weight:800;font-size:15px;letter-spacing:3px;color:var(--board)}
+.coach-zones{display:flex;gap:14px;width:min(560px,100%)}
+.coach-tip,.coach-tap{flex:1;background:rgba(251,241,220,.07);border:2px dashed rgba(251,241,220,.35);border-radius:18px;padding:16px 12px 14px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.coach-tap{flex:none;width:min(560px,100%);flex-direction:row;justify-content:center;gap:12px;border-style:solid;border-color:var(--board)}
+.coach-ic{font-size:34px;line-height:1.1}
+.coach b{font-family:var(--display);font-weight:800;font-size:18px;line-height:1.2}
+.coach span{font-size:13.5px;color:var(--muted)}
+.coach .btn{margin-top:4px;font-size:18px;padding:11px 26px 9px}
+
 /* toasts */
 .toasts{position:fixed;left:50%;top:calc(64px + var(--safe-t));transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;z-index:40}
 .toast{background:rgba(16,37,43,.95);border:1px solid var(--line);border-left:4px solid var(--gold);padding:8px 16px 6px;border-radius:0 10px 10px 0;font-weight:600;animation:toast 4.2s forwards;max-width:86vw;text-align:center}
@@ -185,9 +211,11 @@ button.item:hover{border-color:rgba(255,182,39,.55);background:rgba(255,182,39,.
 
 /* touch */
 .touch{position:fixed;inset:0;pointer-events:none;z-index:15}
-.joy{position:absolute;width:112px;height:112px;margin:-56px 0 0 -56px;border-radius:50%;border:2px solid rgba(251,241,220,.35);background:rgba(16,37,43,.25);display:none}
-.joy.on{display:block}
-.joy i{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;border-radius:50%;background:rgba(251,241,220,.75)}
+/* The joystick rests in view above the corner map, so it is plain where a thumb goes. It jumps to wherever the left thumb lands. */
+.joy{position:absolute;left:calc(18px + var(--safe-l));bottom:calc(122px + var(--safe-b));width:112px;height:112px;border-radius:50%;border:2px solid rgba(251,241,220,.45);background:rgba(16,37,43,.32)}
+.joy.on{margin:-56px 0 0 -56px;bottom:auto;border-color:rgba(251,241,220,.7)}
+.joy i{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:rgba(251,241,220,.85);display:grid;place-items:center;font-style:normal;font-size:24px;line-height:1}
+#ui:not(.playing)>.touch,#ui.has-panel>.touch{display:none}
 .touch-btn{position:absolute;right:calc(18px + var(--safe-r));bottom:calc(96px + var(--safe-b));width:70px;height:70px;border-radius:50%;background:var(--accent);color:#fff;font-family:var(--display);font-weight:800;font-size:15px;box-shadow:0 5px 0 var(--accent-d);pointer-events:auto;display:none}
 .touch-btn.on{display:block}
 

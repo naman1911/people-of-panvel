@@ -75,9 +75,14 @@ export function createUI(game) {
   // the bottom of the screen: what people nearby are saying, and either a place to type or the ghost's way in
   const sayLog = h('div.saylog', { 'aria-live': 'polite' });
   const sayInput = h('input.input', { type: 'text', maxLength: 200, autocomplete: 'off', enterKeyHint: 'send' });
-  const sayForm = h('form.sayform', { hidden: true }, sayInput, h('button.btn', { type: 'submit', 'aria-label': 'Send' }, '➤'));
+  // who the next message goes to: people nearby, everyone in town, or one person
+  let scope = { kind: 'near' };
+  const scopeBtn = h('button.scope', { type: 'button', onclick: () => (scopeMenu.hidden ? openScopes() : (scopeMenu.hidden = true)) });
+  const scopeMenu = h('div.scopemenu', { hidden: true });
+  const sayNote = h('div.saynote', { hidden: true });
+  const sayForm = h('form.sayform', { hidden: true }, scopeBtn, sayInput, h('button.btn', { type: 'submit', 'aria-label': 'Send' }, '➤'));
   const ghostBar = h('div.ghostbar');
-  const say = h('div.say', sayLog, sayForm, ghostBar);
+  const say = h('div.say', sayLog, scopeMenu, sayNote, sayForm, ghostBar);
   // on a computer, a quiet reminder of the keys
   const keys = h('div.hud-keys');
   hud.append(board, top, promptBtn, guideEl, mini, lookHint, say, keys);
@@ -111,7 +116,7 @@ export function createUI(game) {
   ui.refresh = () => {
     const c = live.counts();
     const status = game.status(); // ghost | member | waiting | elsewhere
-    const key = [status, live.state, c.near, c.all, getLang(), game.firstPerson()].join('|');
+    const key = [status, live.state, c.near, c.all, getLang(), game.firstPerson(), scope.kind, scope.mid].join('|');
     if (key === lastState) return;
     lastState = key;
     // people
@@ -122,7 +127,7 @@ export function createUI(game) {
     const speaking = status === 'member' && live.online;
     sayForm.hidden = !speaking;
     ghostBar.hidden = speaking;
-    if (speaking) sayInput.placeholder = c.near ? t(c.near === 1 ? 'say_ph_one' : 'say_ph', { n: c.near }) : t('say_ph_none');
+    if (speaking) drawScope(c);
     else if (status === 'member') ghostBar.replaceChildren(h('span', t(live.state === 'retry' ? 'reconnecting' : 'connecting')));
     else if (status === 'waiting') ghostBar.replaceChildren(h('span', t('almost_in')), h('button.btn.btn--gold.btn--sm', { type: 'button', onclick: () => ui.open('rules') }, t('walk_in')));
     else if (status === 'elsewhere') ghostBar.replaceChildren(h('span', t('elsewhere')), h('button.btn.btn--gold.btn--sm', { type: 'button', onclick: () => game.useHere() }, t('use_here')));
@@ -135,26 +140,78 @@ export function createUI(game) {
   };
   ui.showHud = () => {
     hud.hidden = false;
+    root.classList.add('playing');
     document.getElementById('boot')?.remove();
     drawBoard();
     lastState = '';
     ui.refresh();
   };
 
-  // what is being said nearby
+  // ---- talking: nearby, to everyone, or to one person ---------------------------------
+  const ICON = { near: '📍', town: '🏘', dm: '🔒' };
+  const dmOnline = () => scope.kind !== 'dm' || [...live.peers.values()].some((q) => q.mid === scope.mid);
+  function drawScope(c = live.counts()) {
+    scopeBtn.replaceChildren(ICON[scope.kind], h('span', '▾'));
+    scopeBtn.title = t('to_title');
+    sayInput.placeholder = scope.kind === 'town' ? t('say_town')
+      : scope.kind === 'dm' ? t(dmOnline() ? 'say_dm' : 'say_dm_gone', { name: scope.name })
+        : c.near ? t(c.near === 1 ? 'say_ph_one' : 'say_ph', { n: c.near }) : t('say_ph_none');
+    sayNote.hidden = scope.kind === 'near';
+    sayNote.textContent = scope.kind === 'dm' ? t('dm_note', { name: scope.name }) : t('town_note');
+  }
+  function setScope(next) {
+    scope = next;
+    scopeMenu.hidden = true;
+    lastState = '';
+    ui.refresh();
+  }
+  function openScopes() {
+    const c = live.counts();
+    // everyone you have a private conversation with, newest first
+    const partners = new Map();
+    for (const m of live.log) if (m.scope === 'dm') partners.set(m.with, m.withName);
+    if (scope.kind === 'dm') partners.set(scope.mid, scope.name);
+    const row = (kind, icon, label, sub, next) => h('button' + (scope.kind === kind && scope.mid === next.mid ? '.on' : ''), { type: 'button', onclick: () => { setScope(next); sayInput.focus(); } }, h('span.ic', icon), h('b', label), h('span', sub));
+    scopeMenu.replaceChildren(
+      h('div.k', t('to_title')),
+      row('near', '📍', t('to_near'), c.near ? t('people_near', { n: c.near }) : t('to_near_none'), { kind: 'near' }),
+      row('town', '🏘', t('to_town'), t(c.all === 1 ? 'people_one' : 'people_n', { n: c.all }), { kind: 'town' }),
+      ...[...partners].reverse().map(([mid, name]) => row('dm', '🔒', name, t('to_private'), { kind: 'dm', mid, name })),
+      h('p.small', t('to_tip')));
+    scopeMenu.hidden = false;
+  }
+  /** Start (or go back to) a private conversation with one member. */
+  ui.talkTo = (q) => {
+    setScope({ kind: 'dm', mid: q.mid, name: q.name });
+    ui.focusSay();
+  };
   sayForm.onsubmit = (e) => {
     e.preventDefault();
     if (!sayInput.value.trim()) return sayInput.blur();
-    if (live.say(sayInput.value)) sayInput.value = '';
-    else ui.toast(t('slow_down'));
+    if (live.say(sayInput.value, scope.kind, scope.mid)) sayInput.value = '';
+    else ui.toast(live.sayError === 'gone' ? t('not_here', { name: scope.name }) : t('slow_down'));
   };
   sayInput.onfocus = () => say.classList.add('open');
-  sayInput.onblur = () => say.classList.remove('open');
+  sayInput.onblur = () => setTimeout(() => {
+    // stay open while a choice in the "say it to" list is being made
+    if (document.activeElement !== sayInput && !scopeMenu.contains(document.activeElement) && document.activeElement !== scopeBtn) {
+      say.classList.remove('open');
+      scopeMenu.hidden = true;
+    }
+  }, 120);
   // Focus on the next tick: the Enter that asked for it must not also land in the box and send an empty line.
   ui.focusSay = () => !sayForm.hidden && setTimeout(() => sayInput.focus(), 0);
   ui.blurSay = () => sayInput.blur();
   ui.onChat = (msg) => {
-    const line = h('div.sayline' + (msg.mine ? '.mine' : ''), h('b', msg.mine ? t('you') : msg.name), msg.text);
+    const who = msg.scope === 'dm' ? (msg.mine ? `${t('you')} → ${msg.withName}` : msg.name) : msg.mine ? t('you') : msg.name;
+    const line = h('div.sayline.sayline--' + msg.scope + (msg.mine ? '.mine' : ''), msg.scope === 'near' ? null : h('span.ic', ICON[msg.scope]), h('b', who), msg.text);
+    // tap a line while typing to answer in the same place it was said
+    line.onclick = () => setScope(msg.scope === 'dm' ? { kind: 'dm', mid: msg.with, name: msg.withName } : { kind: msg.scope });
+    if (msg.scope === 'dm' && !msg.mine) {
+      // a private message is answered privately unless you say otherwise
+      if (!sayInput.value) setScope({ kind: 'dm', mid: msg.with, name: msg.withName });
+      if (!say.classList.contains('open')) ui.toast('🔒 ' + msg.name + ': ' + msg.text);
+    }
     sayLog.append(line);
     while (sayLog.children.length > 40) sayLog.firstChild.remove();
     sayLog.scrollTop = sayLog.scrollHeight;
@@ -251,6 +308,7 @@ export function createUI(game) {
     ui.panel.remove();
     ui.panel = null;
     hud.classList.remove('has-panel');
+    root.classList.remove('has-panel');
     const was = ui.panelName;
     ui.panelName = null;
     game.onPanel(null, was);
@@ -261,6 +319,7 @@ export function createUI(game) {
     ui.panelName = name;
     root.append(ui.panel);
     hud.classList.add('has-panel');
+    root.classList.add('has-panel');
     game.onPanel(name);
     return ui.panel;
   }
@@ -290,7 +349,9 @@ export function createUI(game) {
     show('person', 'left',
       h('div.panel-top', h('div.who', h('div.avatar', q.name.trim()[0]), h('h2.panel-title', q.name)), escBtn()),
       h('p.small', t('member_since', { when: since }), ' · ', away(d)),
-      d > 12 ? h('div.row', h('span'), h('button.btn', { type: 'button', onclick: () => { ui.close(); game.rideTo(q); } }, '🛺 ', t('go_to', { name: q.name }))) : h('p.copy', t('right_here')),
+      h('div.row',
+        game.status() === 'member' ? h('button.btn.btn--gold', { type: 'button', onclick: () => { ui.close(); ui.talkTo(q); } }, '🔒 ', t('msg_private')) : h('span'),
+        d > 12 ? h('button.btn', { type: 'button', onclick: () => { ui.close(); game.rideTo(q); } }, '🛺 ', t('go_to', { name: q.name })) : h('span.small', t('right_here'))),
       h('hr.perf'),
       h('div.row', { style: { marginTop: 0 } },
         h('button.link', { type: 'button', onclick: () => { if (confirm(t('hide_sure', { name: q.name }))) { live.block(q.mid); ui.close(); ui.toast(t('hidden')); } } }, t('hide')),
@@ -373,7 +434,7 @@ export function createUI(game) {
     const m = game.member();
     show('rules', 'center',
       h('h2.panel-title', t('welcome_name', { name: m.name })),
-      h('ul.rules', ...['rule_1', 'rule_2', 'rule_3'].map((k) => h('li', t(k)))),
+      h('ul.rules', ...['rule_1', 'rule_2', 'rule_4', 'rule_3'].map((k) => h('li', t(k)))),
       h('div.row', h('span'), h('button.btn', { type: 'button', onclick: () => { game.acceptRules(); ui.close(); } }, t('walk_in'), ' ▸')));
   };
 
@@ -417,8 +478,22 @@ export function createUI(game) {
       row(t('quality'), choice(['low', 'medium', 'high'].map((k) => [k, k.toUpperCase()]), game.quality(), (k) => game.setQuality(k))),
       h('hr.perf'),
       h('p.small', t('about')),
-      h('p.small', touch ? t('how_touch') : t('how_keys')),
+      h('div.row', { style: { marginTop: '4px' } }, h('span.small', touch ? t('how_touch') : t('how_keys')), h('button.btn.btn--ghost.btn--sm', { type: 'button', onclick: () => { ui.close(); ui.coach(); } }, t('coach_title'))),
       h('p.small', '© OpenStreetMap contributors · ', h('a', { href: REPO, target: '_blank', rel: 'noopener' }, 'GitHub')));
+  };
+
+  /** A plain picture of how to move. Shown on the first visit, and from the menu. */
+  ui.coach = () => {
+    store.set('hinted', true);
+    const tip = (icon, title, sub) => h('div.coach-tip', h('div.coach-ic', icon), h('b', title), sub ? h('span', sub) : null);
+    const el = h('div.coach', { onclick: () => el.remove() },
+      h('div.coach-title', t('coach_title')),
+      touch
+        ? h('div.coach-zones', tip('🕹', t('coach_walk'), t('coach_left')), tip('👆', t('coach_look'), t('coach_right')))
+        : h('div.coach-zones', tip('⌨️', t('coach_keys'), 'W A S D  ·  ↑ ↓ ← →'), tip('🖱', t('coach_drag'), t('coach_scroll'))),
+      h('div.coach-tap', h('div.coach-ic', '📍'), h('b', t(touch ? 'coach_tap' : 'coach_click'))),
+      h('button.btn', { type: 'button' }, t('got_it')));
+    root.append(el);
   };
 
   ui.open = (name, arg) => {
@@ -442,12 +517,17 @@ export function createUI(game) {
 
   // ---- touch controls ---------------------------------------------------------------
   if (touch) {
-    const joy = h('div.joy', h('i'));
+    const joy = h('div.joy', h('i', '🚶'));
     const act = h('button.touch-btn', { type: 'button' }, '👋');
     root.append(h('div.touch', joy, act));
     game.input.onStick = (ox, oy, dx, dy, on) => {
       joy.classList.toggle('on', on);
-      if (!on) return;
+      if (!on) {
+        // back to its resting place
+        joy.style.left = joy.style.top = '';
+        joy.firstChild.style.transform = '';
+        return;
+      }
       joy.style.left = ox + 'px';
       joy.style.top = oy + 'px';
       joy.firstChild.style.transform = `translate(${dx}px, ${dy}px)`;

@@ -175,7 +175,9 @@ async function start() {
   let linkProblem = null;
 
   /** ghost: looking only. waiting: has an invite, has not walked in yet. member: in. elsewhere: bumped by another device. */
-  const status = () => (!member ? 'ghost' : elsewhere ? 'elsewhere' : !store.get('rulesOk') ? 'waiting' : 'member');
+  // The rules were last changed when reviewers were given sight of all messages; everyone agrees to them afresh.
+  const RULES = 2;
+  const status = () => (!member ? 'ghost' : elsewhere ? 'elsewhere' : store.get('rulesOk') !== RULES ? 'waiting' : 'member');
   const ghostLook = { woman: false, garb: 'kurta', top: '#f2efe6', bottom: '#5d6d7e', hairStyle: 'short', skin: '#b97c52', acc: [], accent: '#ff5a3c', h: 1 };
   /** Dress the character: a member's own look, or a see-through ghost. */
   function dress(look) {
@@ -277,14 +279,14 @@ async function start() {
     /** Use an invite code typed or pasted by the visitor. */
     async enterCode(code) {
       await adopt(code);
-      if (store.get('rulesOk')) {
+      if (store.get('rulesOk') === RULES) {
         ui.close();
         connect();
         ui.toast(t('welcome_name', { name: member.name }), 'good');
       } else ui.open('rules');
     },
     acceptRules() {
-      store.set('rulesOk', true);
+      store.set('rulesOk', RULES);
       connect();
       ui.toast(t('welcome_name', { name: member.name }), 'good');
     },
@@ -308,7 +310,8 @@ async function start() {
     },
     reportUrl(q) {
       if (!CONFIG.invite.requestEmail) return null;
-      const body = `Member: ${q.name}\nMember id: ${q.mid}\nWhen: ${new Date().toISOString()}\n\nWhat happened:\n`;
+      const said = live.log.filter((m) => m.mid === q.mid && !m.mine).slice(-12).map((m) => `[${new Date(m.at).toLocaleTimeString()}] (${m.scope === 'dm' ? 'private' : m.scope === 'town' ? 'everyone' : 'nearby'}) ${m.text}`).join('\n');
+      const body = `Member: ${q.name}\nMember id: ${q.mid}\nWhen: ${new Date().toISOString()}\n\nWhat happened:\n\n\nWhat they said to me recently:\n${said || '(nothing in this visit)'}\n`;
       return `mailto:${CONFIG.invite.requestEmail}?subject=${encodeURIComponent('Report: ' + q.name)}&body=${encodeURIComponent(body)}`;
     },
 
@@ -358,6 +361,24 @@ async function start() {
     return best ? { text: '👋 ' + best.name.toUpperCase(), id: best.sid, who: best, run: () => ui.open('person', best) } : null;
   }
 
+  // Tap or click a spot on the ground to walk there. Tap a member to open their card.
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), spot = new THREE.Vector3(), probe = new THREE.Vector3();
+  input.onTap = (cx, cy) => {
+    if (state !== 'play' || ui.panel) return;
+    for (const q of live.peers.values()) {
+      if (!q.person || q.dist > 40) continue;
+      probe.set(q.x, q.person.root.position.y + 1, q.z).project(camera);
+      if (probe.z < 1 && Math.hypot(((probe.x + 1) / 2) * innerWidth - cx, ((1 - probe.y) / 2) * innerHeight - cy) < 44) return ui.open('person', q);
+    }
+    ndc.set((cx / innerWidth) * 2 - 1, 1 - (cy / innerHeight) * 2);
+    ray.setFromCamera(ndc, camera);
+    if (!ray.ray.intersectPlane(groundPlane, spot)) return; // the sky
+    const d = Math.hypot(spot.x - player.pos.x, spot.z - player.pos.z);
+    if (d < 1.5 || d > 170) return;
+    game.walkTo({ x: spot.x, z: spot.z, label: t('marker') });
+    sfx.pop();
+  };
+
   input.onPress = (code) => {
     if (state !== 'play') {
       if (code === 'Enter' || code === 'Space') document.querySelector('.intro .btn')?.click();
@@ -389,10 +410,7 @@ async function start() {
     connect();
     if (linkProblem) setTimeout(() => ui.toast(t('link_' + (linkProblem === 'revoked' ? 'revoked' : 'bad'))), 1200);
     else if (status() === 'waiting') setTimeout(() => !ui.panel && ui.open('rules'), 900);
-    else if (!store.get('hinted')) {
-      store.set('hinted', true);
-      setTimeout(() => ui.toast(t(touchDevice ? 'hint_touch' : 'hint_keys')), 1200);
-    }
+    else if (!store.get('hinted')) setTimeout(() => !ui.panel && ui.coach(), 900);
     if (params.has('panel')) setTimeout(() => ui.open(params.get('panel')), 300);
   }
   dress();

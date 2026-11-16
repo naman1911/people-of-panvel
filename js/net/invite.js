@@ -24,6 +24,7 @@ const EPOCH = Date.UTC(2025, 0, 1);
 const DAY = 86400000;
 const CURVE = { name: 'ECDSA', namedCurve: 'P-256' };
 const SIGN = { name: 'ECDSA', hash: 'SHA-256' };
+const DH = { name: 'ECDH', namedCurve: 'P-256' };
 const B32 = 'abcdefghjkmnpqrstuvwxyz234567890'.slice(0, 32);
 const MAX_NAME = 72;
 
@@ -98,9 +99,11 @@ export async function checkPass(pass, reviewers, revoked = []) {
     const rk = await reviewerKey(pub);
     if (!rk) continue;
     if (await crypto.subtle.verify(SIGN, rk, p.sig, signed).catch(() => false)) {
-      const key = await crypto.subtle.importKey('jwk', { kty: 'EC', crv: 'P-256', x: b64u(p.x), y: b64u(p.y) }, CURVE, false, ['verify']).catch(() => null);
-      if (!key) return null;
-      return { mid: p.mid, name: p.name, issued: p.issued, key, pass: typeof pass === 'string' ? pass : b64u(bytes) };
+      const pub = { kty: 'EC', crv: 'P-256', x: b64u(p.x), y: b64u(p.y) };
+      const key = await crypto.subtle.importKey('jwk', pub, CURVE, false, ['verify']).catch(() => null);
+      const dh = await crypto.subtle.importKey('jwk', pub, DH, false, []).catch(() => null);
+      if (!key || !dh) return null;
+      return { mid: p.mid, name: p.name, issued: p.issued, key, dh, pass: typeof pass === 'string' ? pass : b64u(bytes) };
     }
   }
   return null;
@@ -114,7 +117,7 @@ export function tidyCode(text) {
 }
 
 /**
- * Open an invite code. Resolves to the member: { mid, name, issued, pass, key, signKey }.
+ * Open an invite code. Resolves to the member: { mid, name, issued, pass, key, dh, signKey, dhKey }.
  * Rejects with an Error whose message is 'shape', 'revoked' or 'unknown'.
  */
 export async function openInvite(code, reviewers, revoked = []) {
@@ -131,16 +134,18 @@ export async function openInvite(code, reviewers, revoked = []) {
   if (revoked.includes(p.mid)) throw new Error('revoked');
   const member = await checkPass(passBytes, reviewers, revoked);
   if (!member) throw new Error('unknown');
-  let signKey;
+  let signKey, dhKey;
   try {
-    signKey = await crypto.subtle.importKey('jwk', { kty: 'EC', crv: 'P-256', x: b64u(p.x), y: b64u(p.y), d: b64u(d) }, CURVE, false, ['sign']);
+    const priv = { kty: 'EC', crv: 'P-256', x: b64u(p.x), y: b64u(p.y), d: b64u(d) };
+    signKey = await crypto.subtle.importKey('jwk', priv, CURVE, false, ['sign']);
+    dhKey = await crypto.subtle.importKey('jwk', priv, DH, false, ['deriveKey']);
     // the private half must match the public half in the pass
     const probe = new Uint8Array([1, 2, 3]);
     if (!(await crypto.subtle.verify(SIGN, member.key, await crypto.subtle.sign(SIGN, signKey, probe), probe))) throw new Error('shape');
   } catch {
     throw new Error('shape');
   }
-  return { ...member, signKey };
+  return { ...member, signKey, dhKey };
 }
 
 /** Sign a piece of text as a member. */
@@ -151,6 +156,31 @@ export async function checkText(key, text, sig) {
     return await crypto.subtle.verify(SIGN, key, unb64u(sig), new TextEncoder().encode(text));
   } catch {
     return false;
+  }
+}
+
+// ---- private messages --------------------------------------------------------------------
+// A private message is sealed twice: once for the person it is sent to, and once for each
+// reviewer. Other members cannot read it. Reviewers can, to keep people safe. Members are
+// told, before they walk in, that messages are not secret and can be checked.
+
+/** The secret two people share: my private half, their public half. */
+export const sharedKey = (myDhKey, theirDh) => crypto.subtle.deriveKey({ name: 'ECDH', public: theirDh }, myDhKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+/** A reviewer's public key (as listed in the site settings), for sealing. */
+export const reviewerDh = (pub) => crypto.subtle.importKey('raw', unb64u(pub), DH, false, []);
+/** A reviewer's own private half, for reading what was sealed to them. */
+export const reviewerDhKey = (secret) => crypto.subtle.importKey('jwk', { kty: 'EC', crv: 'P-256', x: secret.x, y: secret.y, d: secret.d }, DH, false, ['deriveKey']);
+
+export async function seal(aes, text) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  return { iv: b64u(iv), c: b64u(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aes, new TextEncoder().encode(text))) };
+}
+/** Returns the text, or null if it was not sealed with this key. */
+export async function unseal(aes, box) {
+  try {
+    return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64u(box.iv) }, aes, unb64u(box.c)));
+  } catch {
+    return null;
   }
 }
 
