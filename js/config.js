@@ -2,6 +2,23 @@
 
 export const CONFIG = {
   /**
+   * Who may walk in as a member. Everyone else is a ghost: they can look around
+   * and see members, but nobody sees them and they cannot talk.
+   *
+   * A reviewer makes personal invite codes on the page /reviewer.html and emails
+   * them out. That page also makes the reviewer's key the first time it is used.
+   */
+  invite: {
+    // Public keys of the reviewers. An invite only works if one of these people made it.
+    reviewers: [],
+    // Where "Ask for an invite" sends people. An email address, or leave it empty and give a form link below.
+    requestEmail: '',
+    requestUrl: '',
+    // Member ids (eight letters and digits, shown on the reviewer page) whose invites are withdrawn.
+    revoked: [],
+  },
+
+  /**
    * Satellite photos for the ground and rooftops.
    *
    * The default provider is Esri World Imagery, which needs a free API key:

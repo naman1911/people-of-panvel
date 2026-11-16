@@ -149,6 +149,22 @@ export function shrink(src, factor = 2) {
   return c;
 }
 
+/**
+ * Quieten a texture by washing it towards its own average colour, so a street
+ * or a lawn reads as one clean surface with only a hint of grain.
+ */
+export function calm(canvas, amount) {
+  const [, one] = cv(1, 1);
+  one.drawImage(canvas, 0, 0, 1, 1);
+  const [r, g, b] = one.getImageData(0, 0, 1, 1).data;
+  const ctx = canvas.getContext('2d');
+  ctx.globalAlpha = amount;
+  ctx.fillStyle = `rgb(${r},${g},${b})`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.globalAlpha = 1;
+  return canvas;
+}
+
 export function tex(canvas, { srgb = true, repeat = true, aniso = true, mips = true } = {}) {
   const t = new THREE.CanvasTexture(canvas);
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;

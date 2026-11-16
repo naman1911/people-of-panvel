@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Reviewer · People of Panvel</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Mukta:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root { --ink: #10252b; --ink-2: #17343b; --line: rgba(251, 241, 220, .18); --paper: #fbf1dc; --muted: #a9bcc0; --accent: #ff5a3c; --board: #f2c21a; --green: #3ddc84; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--ink); color: var(--paper); font: 16px/1.5 "Mukta", system-ui, sans-serif; }
+    main { max-width: 680px; margin: 0 auto; padding: 28px 18px 60px; }
+    h1 { font: 800 34px/1 "Baloo 2", sans-serif; margin: 0 0 4px; }
+    h1 small { display: block; font: 600 13px "Baloo 2", sans-serif; letter-spacing: 3px; color: var(--board); margin-bottom: 6px; }
+    h2 { font: 800 20px "Baloo 2", sans-serif; letter-spacing: .5px; margin: 0 0 8px; }
+    section { background: var(--ink-2); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; margin-top: 16px; }
+    p { margin: 6px 0; }
+    .muted { color: var(--muted); font-size: 14px; }
+    label { display: block; font: 600 12px "Baloo 2", sans-serif; letter-spacing: 1.5px; color: var(--muted); margin: 12px 0 4px; }
+    input[type=text], input[type=email], textarea { width: 100%; background: #0b1b20; color: var(--paper); border: 1px solid #214750; border-bottom: 2px solid var(--accent); border-radius: 8px; padding: 9px 11px; font: inherit; }
+    textarea { font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace; word-break: break-all; resize: vertical; }
+    button, .btn { display: inline-block; font: 800 15px "Baloo 2", sans-serif; letter-spacing: .6px; border: 0; border-radius: 10px; padding: 9px 16px 7px; background: var(--accent); color: #fff; cursor: pointer; text-decoration: none; margin: 10px 8px 0 0; }
+    button.quiet, .btn.quiet { background: rgba(251, 241, 220, .1); box-shadow: inset 0 0 0 1px var(--line); }
+    button.gold { background: var(--board); color: var(--ink); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .ok { color: var(--green); font-weight: 600; }
+    .warn { color: #ffb38a; font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+    th { text-align: left; font: 600 11px "Baloo 2", sans-serif; letter-spacing: 1.4px; color: var(--muted); padding: 4px 6px; }
+    td { padding: 6px; border-top: 1px solid var(--line); vertical-align: top; word-break: break-word; }
+    td code { font-size: 13px; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <main id="app">
+    <h1><small>PEOPLE OF PANVEL</small>Reviewer</h1>
+    <p class="muted">This page makes the personal invite codes that let people into Panvel. Everything happens in this browser. Nothing is sent anywhere.</p>
+    <noscript><p class="warn">This page needs JavaScript.</p></noscript>
+  </main>
+  <script type="module" src="js/reviewer.js?v=6"></script>
+</body>
+</html>

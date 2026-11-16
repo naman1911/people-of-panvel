@@ -29,7 +29,7 @@ function geos() {
 }
 
 // One shared material: every person is a handful of vertex-coloured meshes.
-let bodyMat = null, blobMat = null;
+let bodyMat = null, blobMat = null, ghostMat = null;
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _c = new THREE.Color();
 const flatCache = new Map();
 function flat(geo) {
@@ -317,7 +317,20 @@ export class Person {
     this.body.rotation.y += (twist - this.body.rotation.y) * k;
     this.torso.rotation.x += (lean - this.torso.rotation.x) * k;
     if (this.skirt) this.skirt.visible = !seated;
-    this.blob.visible = pose !== 'drive';
+    this.blob.visible = !this.ghost;
+  }
+
+  /** A ghost is see-through. */
+  setGhost(on) {
+    if (on && !ghostMat) ghostMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.84, transparent: true, opacity: 0.42, depthWrite: false });
+    this.root.traverse((o) => {
+      if (o.isMesh && o !== this.blob) {
+        o.material = on ? ghostMat : bodyMat;
+        o.castShadow = !on;
+      }
+    });
+    this.blob.visible = !on;
+    this.ghost = on;
   }
 
   setShadows(on) {

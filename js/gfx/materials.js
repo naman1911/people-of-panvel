@@ -4,19 +4,19 @@
 import * as THREE from 'three';
 import * as SF from './surfaces.js';
 import { FACADES, shopAtlas } from './facades.js';
-import { tex, shrink, setNormals } from './texkit.js';
+import { tex, shrink, setNormals, calm } from './texkit.js';
 
 /**
  * Each entry: [surface generator, metres per texture repeat, roughness, options].
  * Geometry on these layers gets world-space UVs automatically.
  */
 const SURFACES = {
-  asphalt: [SF.asphalt, 7, 0.92, { wet: true, puddles: true }],
-  paver: [SF.pavers, 3.2, 0.88, { wet: true }],
-  concrete: [SF.concrete, 5.12, 0.9, { wet: true }],
-  earth: [SF.earth, 14, 1, { wet: true }],
-  grass: [SF.grass, 6, 1, {}],
-  plaster: [SF.plaster, 5, 0.92, {}],
+  asphalt: [SF.asphalt, 7, 0.92, { wet: true, puddles: true, calm: 0.6 }],
+  paver: [SF.pavers, 3.2, 0.88, { wet: true, calm: 0.68 }],
+  concrete: [SF.concrete, 5.12, 0.9, { wet: true, calm: 0.55 }],
+  earth: [SF.earth, 14, 1, { wet: true, calm: 0.55 }],
+  grass: [SF.grass, 6, 1, { calm: 0.6 }],
+  plaster: [SF.plaster, 5, 0.92, { calm: 0.35 }],
   terrace: [SF.terrace, 8, 0.9, { wet: true }],
   tile: [SF.clayTiles, 2.56, 0.8, {}],
   tin: [SF.tinSheet, 2.56, 0.55, { metalness: 0.35 }],
@@ -37,6 +37,8 @@ export function buildMaterials(quality) {
 
   for (const [name, [gen, scale, rough, o]] of Object.entries(SURFACES)) {
     const s = gen();
+    // streets, footpaths and lawns are kept quiet, so the town reads cleanly and people stand out
+    if (o.calm) calm(s.map, o.calm);
     const m = new THREE.MeshStandardMaterial({
       map: tex(fit(s.map)),
       normalMap: s.normalMap ? tex(s.normalMap, { srgb: false }) : null,
@@ -45,6 +47,7 @@ export function buildMaterials(quality) {
       vertexColors: true,
     });
     if (o.normalScale) m.normalScale.setScalar(o.normalScale);
+    else if (o.calm) m.normalScale.setScalar(0.45);
     if (s.roughnessMap && o.puddles) m.userData.puddleMap = tex(s.roughnessMap, { srgb: false });
     m.userData.uvScale = 1 / scale;
     m.userData.baseRough = rough;

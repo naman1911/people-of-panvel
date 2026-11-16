@@ -1,10 +1,9 @@
 // A real map of Panvel, drawn from the same OpenStreetMap data as the 3D town:
 // a small round minimap in the corner and a full map you can open.
 
-import { STAMPS, HUBS, ZONES } from './data/places.js';
+import { HUBS, ZONES } from './data/places.js';
 import { STREET_MR } from './data/streets.js';
 import { along } from './world/geom.js';
-import { store } from './store.js';
 import { getLang } from './i18n.js';
 
 const ROAD_W = { M: 16, T: 15, t: 8, P: 13, p: 8, S: 11, s: 7, E: 9, e: 6, R: 6.5, L: 5, V: 4, D: 5, F: 2.4, H: 2, X: 2.4 };
@@ -128,30 +127,30 @@ export function createMap(data) {
 
   /** Markers shared by both views. `tx` maps world metres to canvas pixels. */
   function markers(ctx, tx, game, big) {
-    const got = store.get('stamps');
-    for (const s of STAMPS) {
-      const [x, y] = tx(s.x, s.z);
-      if (big) {
-        ctx.font = '15px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.globalAlpha = got.includes(s.id) ? 1 : 0.55;
-        ctx.fillText(s.icon, x, y);
-        ctx.globalAlpha = 1;
-      } else dot(ctx, x, y, 3.5, got.includes(s.id) ? '#ffb627' : null, '#b8860b');
-    }
+    // rickshaw stands: tap one on the big map to ride there
     for (const hb of HUBS) {
       const [x, y] = tx(hb.x, hb.z);
-      dot(ctx, x, y, big ? 5 : 3.5, '#1b1b1b', '#f2c21a');
+      if (big) {
+        ctx.font = '17px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🛺', x, y);
+      } else dot(ctx, x, y, 3, '#1b1b1b', '#f2c21a');
     }
+    // members who are in town now
     for (const v of game.live.peers.values()) {
       const [x, y] = tx(v.x, v.z);
-      dot(ctx, x, y, big ? 4.5 : 3.4, '#3ddc84', '#0b5a2e');
-    }
-    const met = store.get('met');
-    for (const n of game.residents.list) {
-      const [x, y] = tx(n.x, n.z);
-      dot(ctx, x, y, big ? 3.5 : 2.6, met.includes(n.def.id) ? '#ff5a3c' : '#ffffff', '#ff5a3c');
+      dot(ctx, x, y, big ? 5.5 : 4, '#3ddc84', '#0b5a2e');
+      if (big) {
+        ctx.font = '700 11px "Mukta", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(255,255,255,.85)';
+        ctx.strokeText(v.name, x, y - 7);
+        ctx.fillStyle = '#0b3d22';
+        ctx.fillText(v.name, x, y - 7);
+      }
     }
   }
 

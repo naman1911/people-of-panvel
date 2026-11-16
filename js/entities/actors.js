@@ -21,10 +21,7 @@ export class Player {
     this.y = 0;
     this.yaw = 0;
     this.speed = 0;
-    this.mode = 'walk'; // walk | sit | drive | ride
     this.auto = null; // { pts, i, stop } when walking a route by itself
-    this.vehicle = null;
-    this.seat = null;
     this.person = null;
     this.setLook({ woman: false, garb: 'kurta', top: '#f2efe6', bottom: '#5d6d7e', hairStyle: 'short', skin: '#b97c52', acc: ['bag'], accent: '#ff5a3c', h: 1 });
   }
@@ -39,119 +36,12 @@ export class Player {
     this.pos.z = p.z;
     this.yaw = face;
     this.y = this.world.heightAt(p.x, p.z);
-    this.mode = 'walk';
-    this.vehicle = null;
-    this.seat = null;
-  }
-  sit(seat) {
-    this.mode = 'sit';
-    this.seat = seat;
-    this.pos.x = seat.x;
-    this.pos.z = seat.z;
-    this.yaw = seat.ry;
-    this.speed = 0;
-  }
-  stand() {
-    if (this.mode !== 'sit') return;
-    const s = this.seat;
-    this.mode = 'walk';
-    this.seat = null;
-    const p = this.world.findFree(s.x + Math.sin(s.ry) * 1.0, s.z + Math.cos(s.ry) * 1.0, 0.4, 6);
-    this.pos.x = p.x;
-    this.pos.z = p.z;
-  }
-  /** Hop into another visitor's rickshaw. */
-  ride(peerId) {
     this.auto = null;
-    this.mode = 'ride';
-    this.rideId = peerId;
-    this.rideSeat = null;
-  }
-  leaveRide() {
-    if (this.mode !== 'ride') return;
-    this.mode = 'walk';
-    this.rideId = null;
-    const p = this.world.findFree(this.pos.x + Math.sin(this.yaw + 1.57) * 1.6, this.pos.z + Math.cos(this.yaw + 1.57) * 1.6, 0.4, 8);
-    this.pos.x = p.x;
-    this.pos.z = p.z;
-  }
-  enter(vehicle) {
-    this.auto = null;
-    this.mode = 'drive';
-    this.vehicle = vehicle;
-    vehicle.driven = true;
-    if (vehicle.solid) this.world.removeSolid(vehicle.solid);
-    vehicle.solid = null;
-  }
-  exit() {
-    const v = this.vehicle;
-    if (!v) return;
-    v.driven = false;
-    v.speed = 0;
-    v.solid = this.world.addSolid(v.x, v.z, 1.2);
-    this.mode = 'walk';
-    this.vehicle = null;
-    // step out on the left
-    const p = this.world.findFree(v.x + Math.sin(v.yaw) * -1.6, v.z + Math.cos(v.yaw) * -1.6, 0.4, 8);
-    this.pos.x = p.x;
-    this.pos.z = p.z;
   }
 
   update(dt, input, camYaw, traffic) {
     const w = this.world;
     const mv = input.move();
-    if (this.mode === 'drive') {
-      const v = this.vehicle;
-      const max = mv.run ? 19 : 14;
-      if (mv.y > 0.1) v.speed += 9 * dt * mv.y;
-      else if (mv.y < -0.1) v.speed += (v.speed > 0.5 ? 22 : 6) * dt * mv.y;
-      else v.speed -= Math.sign(v.speed) * Math.min(Math.abs(v.speed), 5 * dt);
-      v.speed = clamp(v.speed, -5, max);
-      const steer = -mv.x;
-      v.yaw += steer * 1.9 * dt * clamp(Math.abs(v.speed) / 5, 0, 1) * Math.sign(v.speed || 1);
-      const p = { x: v.x + Math.cos(v.yaw) * v.speed * dt, z: v.z - Math.sin(v.yaw) * v.speed * dt };
-      if (w.resolve(p, 1.05)) v.speed *= Math.pow(0.02, dt);
-      if (w.inWater(p.x, p.z)) {
-        p.x = v.x;
-        p.z = v.z;
-        v.speed = 0;
-      }
-      v.x = p.x;
-      v.z = p.z;
-      v.group.position.set(v.x, 0, v.z);
-      v.group.rotation.y = v.yaw;
-      // sit in the driver's seat
-      this.pos.x = v.x + Math.cos(v.yaw) * 0.25;
-      this.pos.z = v.z - Math.sin(v.yaw) * 0.25;
-      this.yaw = v.yaw + Math.PI / 2;
-      this.speed = Math.abs(v.speed);
-      this.y = 0;
-      this.person.root.position.set(this.pos.x, 0.27, this.pos.z);
-      this.person.root.rotation.y = this.yaw;
-      this.person.update(dt, 0, 'drive');
-      return;
-    }
-    if (this.mode === 'ride') {
-      // the seat is worked out each frame by the game from where the driver is
-      const st = this.rideSeat;
-      if (st) {
-        this.pos.x = st.x;
-        this.pos.z = st.z;
-        this.yaw = st.h + Math.PI / 2;
-        this.speed = st.v || 0;
-      }
-      this.y = 0;
-      this.person.root.position.set(this.pos.x, 0.27, this.pos.z);
-      this.person.root.rotation.y = this.yaw;
-      this.person.update(dt, 0, 'sit');
-      return;
-    }
-    if (this.mode === 'sit') {
-      this.person.root.position.set(this.pos.x, this.y - 0.06, this.pos.z);
-      this.person.root.rotation.y = this.yaw;
-      this.person.update(dt, 0, 'sit');
-      return;
-    }
     const mag = Math.hypot(mv.x, mv.y);
     let dx = 0, dz = 0, target = 0;
     if (mag > 0.05) {
@@ -250,8 +140,8 @@ export class CameraRig {
   update(dt, look, turn, player, world) {
     if (look.x || look.y) this.idle = 0;
     else this.idle += dt;
-    const fp = this.fp && player.mode !== 'drive';
-    if (player.auto && player.mode === 'walk' && this.idle > 0.7) this.yaw += angDiff(this.yaw, player.yaw + Math.PI) * (1 - Math.exp(-dt * 3));
+    const fp = this.fp;
+    if (player.auto && this.idle > 0.7) this.yaw += angDiff(this.yaw, player.yaw + Math.PI) * (1 - Math.exp(-dt * 3));
     this.yaw -= look.x * (fp ? 0.0028 : 0.0046) + turn * 1.9 * dt;
     this.pitch = clamp(this.pitch + look.y * (fp ? 0.0026 : 0.0036), fp ? -1.25 : -0.12, 1.45);
     const c = this.camera;
@@ -260,7 +150,7 @@ export class CameraRig {
     if (fp) {
       // eyes: head height, with the small rise and sway of each step
       const h = player.person.height;
-      const base = player.mode === 'ride' ? 0.27 + h * 0.66 : player.y + (player.mode === 'sit' ? h * 0.68 : h * 0.94);
+      const base = player.y + h * 0.94;
       const stride = Math.min(1, player.speed / 3);
       const bob = Math.sin(player.person.phase * 2) * 0.03 * stride;
       const sway = Math.cos(player.person.phase) * 0.022 * stride;
@@ -275,21 +165,15 @@ export class CameraRig {
 
     // scroll out far enough for a drone's-eye view of the town
     if (look.zoom) this.dist = clamp(this.dist * Math.pow(1.14, look.zoom), 2.4, 160);
-    // swing in behind the rickshaw while driving, unless the player is looking around
-    if (player.mode === 'drive' && this.idle > 0.8 && Math.abs(player.vehicle.speed) > 1.5) {
-      const v = player.vehicle;
-      const want = Math.atan2(-Math.cos(v.yaw), Math.sin(v.yaw));
-      this.yaw += angDiff(this.yaw, want) * (1 - Math.exp(-dt * 2.2));
-    }
     const k = 1 - Math.exp(-dt * 12);
-    const ty = player.y + (player.mode === 'walk' ? 1.45 : 1.25);
+    const ty = player.y + 1.45;
     this.target.x += (player.pos.x - this.target.x) * k;
     this.target.y += (ty - this.target.y) * k;
     this.target.z += (player.pos.z - this.target.z) * k;
-    const tp = this.fp ? Math.max(0.22, this.pitch) : this.pitch;
+    const tp = this.pitch;
     const cq = Math.cos(tp), sq = Math.sin(tp);
     const dx = Math.sin(this.yaw) * cq, dz = Math.cos(this.yaw) * cq;
-    let want = this.dist * (player.mode === 'drive' ? 1.25 : 1);
+    let want = this.dist;
     // keep walls from coming between you and the camera
     if (this.target.y + sq * want < 13) {
       const t = world.walls.cast(this.target.x, this.target.z, this.target.x + dx * want, this.target.z + dz * want);
@@ -299,103 +183,6 @@ export class CameraRig {
     c.position.set(this.target.x + dx * this.cur, Math.max(0.35, this.target.y + sq * this.cur), this.target.z + dz * this.cur);
     c.lookAt(this.target);
     player.person.root.visible = this.cur > 1.9;
-  }
-}
-
-// ---- named residents --------------------------------------------------------------
-
-export class Residents {
-  constructor(scene, world, defs) {
-    this.world = world;
-    this.list = defs.map((def) => {
-      const rnd = mulberry32(hashStr(def.id));
-      const person = new Person(def.look, rnd);
-      const p = world.findFree(def.at[0], def.at[1], 0.45, 30);
-      person.root.position.set(p.x, world.heightAt(p.x, p.z), p.z);
-      scene.add(person.root);
-      const n = {
-        def, person, x: p.x, z: p.z, hx: p.x, hz: p.z, yaw: rnd() * 6.28, baseYaw: 0, speed: 0,
-        t: rnd() * 4, target: null, say: null, sayUntil: 0, nextSay: 4 + rnd() * 18, rnd, solid: null, near: false,
-      };
-      n.baseYaw = n.yaw;
-      if (def.mode !== 'wander') n.solid = world.addSolid(p.x, p.z, 0.35);
-      return n;
-    });
-    this.byId = new Map(this.list.map((n) => [n.def.id, n]));
-  }
-
-  update(dt, player, time, lang) {
-    const px = player.pos.x, pz = player.pos.z;
-    for (const n of this.list) {
-      const d = Math.hypot(n.x - px, n.z - pz);
-      n.dist = d;
-      const vis = d < 170;
-      n.person.root.visible = vis;
-      if (!vis) continue;
-      const close = d < 3.6 && player.mode !== 'drive';
-      n.near = close;
-      let speed = 0;
-      if (close) {
-        // turn to face whoever walked up
-        const want = Math.atan2(px - n.x, pz - n.z);
-        n.yaw += angDiff(n.yaw, want) * (1 - Math.exp(-dt * 7));
-      } else if (n.def.mode === 'wander') {
-        n.t -= dt;
-        if (!n.target && n.t <= 0) {
-          const a = n.rnd() * 6.283, r = (0.3 + n.rnd() * 0.7) * n.def.r;
-          const tx = n.hx + Math.cos(a) * r, tz = n.hz + Math.sin(a) * r;
-          if (this.world.isFree(tx, tz, 0.4) && !this.world.walls.blocked(n.x, n.z, tx, tz)) n.target = { x: tx, z: tz };
-          else n.t = 0.6;
-        }
-        if (n.target) {
-          const dx = n.target.x - n.x, dz = n.target.z - n.z, dl = Math.hypot(dx, dz);
-          if (dl < 0.4) {
-            n.target = null;
-            n.t = 2 + n.rnd() * 6;
-          } else {
-            speed = 1.5;
-            const want = Math.atan2(dx, dz);
-            n.yaw += angDiff(n.yaw, want) * (1 - Math.exp(-dt * 6));
-            const p = { x: n.x + (dx / dl) * speed * dt, z: n.z + (dz / dl) * speed * dt };
-            if (this.world.resolve(p, 0.35)) {
-              n.stuck = (n.stuck || 0) + dt;
-              if (n.stuck > 1) (n.target = null), (n.stuck = 0), (n.t = 1);
-            } else n.stuck = 0;
-            n.x = p.x;
-            n.z = p.z;
-          }
-        }
-      } else {
-        n.yaw += angDiff(n.yaw, n.baseYaw) * (1 - Math.exp(-dt * 2));
-      }
-      n.speed += (speed - n.speed) * (1 - Math.exp(-dt * 8));
-      const root = n.person.root;
-      const sitting = n.def.mode === 'sit';
-      root.position.set(n.x, this.world.heightAt(n.x, n.z) + (sitting ? -0.06 : 0), n.z);
-      root.rotation.y = n.yaw;
-      n.person.update(dt, n.speed, sitting ? 'sit' : 'stand');
-      n.person.setShadows(d < 45);
-      // idle chatter
-      n.nextSay -= dt;
-      if (n.nextSay <= 0 && d < 28) {
-        const line = n.def.lines[(n.rnd() * n.def.lines.length) | 0];
-        n.say = line[lang] || line.en;
-        n.sayUntil = time + 4.2;
-        n.nextSay = 14 + n.rnd() * 26;
-      }
-      if (n.say && time > n.sayUntil) n.say = null;
-    }
-  }
-
-  speak(n, time, lang, idx) {
-    const lines = n.def.lines;
-    n.lineIdx = idx ?? ((n.lineIdx ?? -1) + 1) % lines.length;
-    const line = lines[n.lineIdx];
-    n.say = line[lang] || line.en;
-    n.sayUntil = time + 5;
-    n.nextSay = 20;
-    n.person.wave(1.4);
-    return n.say;
   }
 }
 
@@ -572,7 +359,7 @@ export class Traffic {
   }
 }
 
-// ---- rickshaws you can drive ----------------------------------------------------------
+// ---- rickshaws waiting at the stands -----------------------------------------------------
 
 export class Rickshaws {
   constructor(scene, world, lib, spots) {
@@ -582,7 +369,8 @@ export class Rickshaws {
       group.position.set(p.x, 0, p.z);
       group.rotation.y = s.yaw;
       scene.add(group);
-      return { group, x: p.x, z: p.z, yaw: s.yaw, speed: 0, driven: false, solid: world.addSolid(p.x, p.z, 1.2) };
+      world.addSolid(p.x, p.z, 1.2);
+      return { group, x: p.x, z: p.z };
     });
   }
 }
@@ -601,41 +389,16 @@ function animal(m, kind) {
 }
 
 export class Strays {
+  /** Dogs and cats asleep near the stands. */
   constructor(scene, world, lib, spots) {
-    const names = [['Moti', 'मोती', 'dog'], ['Raja', 'राजा', 'dog'], ['Mau', 'माऊ', 'cat'], ['Kalu', 'काळू', 'dog'], ['Chiu', 'चिऊ', 'cat'], ['Tommy', 'टॉमी', 'dog']];
-    this.world = world;
-    this.list = spots.map((s, i) => {
-      const [en, mr, kind] = names[i % names.length];
-      const group = buildModel(lib, (m) => animal(m, kind));
+    spots.forEach((s, i) => {
+      const group = buildModel(lib, (m) => animal(m, i % 3 === 2 ? 'cat' : 'dog'));
       const p = world.findFree(s.x, s.z, 0.5, 20);
       group.position.set(p.x, 0, p.z);
       group.rotation.y = i * 1.7;
+      group.scale.y = 0.62; // curled up
       scene.add(group);
-      return { group, kind, name: { en, mr }, x: p.x, z: p.z, hx: p.x, hz: p.z, yaw: i * 1.7, follow: false, t: 0 };
     });
-  }
-  update(dt, player) {
-    for (const a of this.list) {
-      a.t += dt;
-      let tx = a.hx, tz = a.hz, stop = 0.4;
-      if (a.follow && player.mode !== 'drive') (tx = player.pos.x), (tz = player.pos.z), (stop = 1.6);
-      const dx = tx - a.x, dz = tz - a.z, d = Math.hypot(dx, dz);
-      let moving = false;
-      if (d > stop) {
-        const sp = Math.min(a.follow ? 11 : 4, d * 2.2);
-        const p = { x: a.x + (dx / d) * sp * dt, z: a.z + (dz / d) * sp * dt };
-        this.world.walls.resolve(p, 0.25);
-        a.x = p.x;
-        a.z = p.z;
-        a.yaw += angDiff(a.yaw, Math.atan2(-dz, dx)) * (1 - Math.exp(-dt * 8));
-        moving = true;
-      }
-      const g = a.group;
-      g.position.set(a.x, moving ? Math.abs(Math.sin(a.t * 14)) * 0.05 : 0, a.z);
-      g.rotation.y = a.yaw;
-      // curled up asleep when left alone
-      g.scale.y = !moving && !a.follow ? 0.62 : 1;
-    }
   }
 }
 
@@ -758,71 +521,34 @@ export class LocalTrain {
   }
 }
 
-// ---- other visitors, live ------------------------------------------------------------
+// ---- members seen live -----------------------------------------------------------------
 
 export class Visitors {
-  constructor(scene, world, lib) {
+  constructor(scene, world) {
     this.scene = scene;
     this.world = world;
-    this.lib = lib;
-    this.shown = new Map(); // peer id -> Person
-    this.autos = new Map(); // driving peer id -> rickshaw model
+    this.shown = new Map(); // session id -> Person
     this.rnd = mulberry32(31337);
-  }
-
-  /** Where a passenger sits in a rickshaw at (x, z) heading h. slot is -1 or 1. */
-  static seat(x, z, h, slot) {
-    return { x: x + Math.cos(h) * -0.75 + Math.sin(h) * slot * 0.3, z: z - Math.sin(h) * -0.75 + Math.cos(h) * slot * 0.3 };
-  }
-  /** The rickshaw a driver is in: centre and heading, from where the driver sits and faces. */
-  static autoOf(p) {
-    const h = p.yaw - Math.PI / 2;
-    return { x: p.x - Math.cos(h) * 0.25, z: p.z + Math.sin(h) * 0.25, h };
   }
 
   update(dt, live, player) {
     const now = Date.now();
     const k = 1 - Math.exp(-dt * 9);
     let count = 0;
-    const driving = new Set();
     for (const p of live.peers.values()) {
-      // ease towards the last reported position; snap if they jumped (rickshaw ride, rejoin)
+      // ease towards the last reported position; snap if they jumped (a ride across town, a rejoin)
       if (Math.hypot(p.tx - p.x, p.tz - p.z) > 14) (p.x = p.tx), (p.z = p.tz);
       p.x += (p.tx - p.x) * k;
       p.z += (p.tz - p.z) * k;
       p.yaw += angDiff(p.yaw, p.tyaw) * k;
-    }
-    for (const p of live.peers.values()) {
-      let x = p.x, z = p.z, yaw = p.yaw, y = this.world.heightAt(p.x, p.z);
-      let pose = p.mode === 0 ? 'stand' : p.mode === 2 ? 'drive' : 'sit';
-      if (p.mode === 2) y = 0.27;
-      else if (p.mode === 1) y -= 0.06;
-      else if (p.mode === 3) {
-        // a passenger sits wherever their driver's rickshaw is
-        let auto = null;
-        if (p.ref === live.id && player.mode === 'drive') auto = { x: player.vehicle.x, z: player.vehicle.z, h: player.vehicle.yaw };
-        else {
-          const d = live.peers.get(p.ref);
-          if (d && d.mode === 2) auto = Visitors.autoOf(d);
-        }
-        if (auto) {
-          const st = Visitors.seat(auto.x, auto.z, auto.h, p.id.charCodeAt(12) % 2 ? 1 : -1);
-          x = st.x;
-          z = st.z;
-          yaw = auto.h + Math.PI / 2;
-          y = 0.27;
-        } else pose = 'stand';
-      }
-      const d = Math.hypot(x - player.pos.x, z - player.pos.z);
+      const d = Math.hypot(p.x - player.pos.x, p.z - player.pos.z);
       p.dist = d;
-      p.rx = x;
-      p.rz = z;
       const want = d < 170 && count < 30;
-      let person = this.shown.get(p.id);
+      let person = this.shown.get(p.sid);
       if (!want) {
         if (person) {
           person.dispose();
-          this.shown.delete(p.id);
+          this.shown.delete(p.sid);
         }
         p.person = null;
         continue;
@@ -833,71 +559,20 @@ export class Visitors {
         person = new Person(p.look, this.rnd);
         person.rev = p.lookRev;
         this.scene.add(person.root);
-        this.shown.set(p.id, person);
+        this.shown.set(p.sid, person);
       }
       p.person = person;
-      person.root.position.set(x, y, z);
-      person.root.rotation.y = yaw;
-      if (p.gesture) {
-        // a slow device may draw its next frame well after the news arrived
-        if (now - p.gestureAt < 3000) person.emote(p.gesture);
-        p.gesture = null;
-      }
+      person.root.position.set(p.x, this.world.heightAt(p.x, p.z), p.z);
+      person.root.rotation.y = p.yaw;
       // if news stops arriving, they stand still rather than walk on the spot
-      const moving = now - p.moved < 900 ? p.v : 0;
-      person.update(dt, pose === 'stand' ? moving : 0, pose);
+      person.update(dt, now - p.moved < 900 ? p.v : 0, 'stand');
       person.setShadows(d < 45);
       if (p.say && now > p.sayUntil) p.say = null;
-      // drivers bring their rickshaw with them
-      if (p.mode === 2) {
-        driving.add(p.id);
-        let g = this.autos.get(p.id);
-        if (!g) {
-          g = buildModel(this.lib, (m) => M.auto(m));
-          this.scene.add(g);
-          this.autos.set(p.id, g);
-          // They took one of the parked rickshaws: put our copy of it away while they drive it.
-          const at = Visitors.autoOf({ x: p.tx, z: p.tz, yaw: p.tyaw });
-          const mine = this.rickshaws?.list.find((r) => !r.driven && !r.takenBy && Math.hypot(r.x - at.x, r.z - at.z) < 3);
-          if (mine) {
-            mine.takenBy = p.id;
-            mine.group.visible = false;
-            if (mine.solid) this.world.removeSolid(mine.solid);
-            mine.solid = null;
-            g.userData.mine = mine;
-          }
-        }
-        const a = Visitors.autoOf(p);
-        g.position.set(a.x, 0, a.z);
-        g.rotation.y = a.h;
-        g.userData.last = a;
-      }
     }
-    for (const [id, person] of this.shown) {
-      if (!live.peers.has(id)) {
+    for (const [sid, person] of this.shown) {
+      if (!live.peers.has(sid)) {
         person.dispose();
-        this.shown.delete(id);
-      }
-    }
-    for (const [id, g] of this.autos) {
-      if (!driving.has(id)) {
-        // the rickshaw stays parked where its driver left it
-        const mine = g.userData.mine, a = g.userData.last;
-        if (mine) {
-          mine.takenBy = null;
-          if (!mine.driven) {
-            mine.x = a.x;
-            mine.z = a.z;
-            mine.yaw = a.h;
-            mine.group.position.set(a.x, 0, a.z);
-            mine.group.rotation.y = a.h;
-            mine.solid = this.world.addSolid(a.x, a.z, 1.2);
-          }
-          mine.group.visible = true;
-        }
-        g.removeFromParent();
-        g.traverse((o) => o.isMesh && o.geometry.dispose());
-        this.autos.delete(id);
+        this.shown.delete(sid);
       }
     }
   }

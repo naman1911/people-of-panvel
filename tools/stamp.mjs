@@ -23,7 +23,8 @@ const walk = (dir) => readdirSync(join(root, dir)).flatMap((name) => {
   const rel = join(dir, name);
   return statSync(join(root, rel)).isDirectory() ? walk(rel) : rel.endsWith('.js') ? [relative(root, join(root, rel)).split('\\').join('/')] : [];
 }).sort();
-const own = walk('js');
+// the reviewer page is separate from the town and loads its own script
+const own = walk('js').filter((f) => f !== 'js/reviewer.js');
 const addons = walk('vendor/addons');
 
 const map = { three: './vendor/three.module.min.js' };
@@ -46,4 +47,6 @@ swap(/<!-- preload:start -->[\s\S]*?<!-- preload:end -->/, `<!-- preload:start -
 swap(/<script type="module" src="js\/main\.js\?v=\d+"><\/script>/, `<script type="module" src="js/main.js?v=${v}"></script>`);
 
 writeFileSync(file, html);
+const reviewer = join(root, 'reviewer.html');
+writeFileSync(reviewer, readFileSync(reviewer, 'utf8').replace(/js\/reviewer\.js\?v=\d+/, `js/reviewer.js?v=${v}`));
 console.log(`stamped v${v}: ${own.length} modules`);

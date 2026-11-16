@@ -1,26 +1,17 @@
-// Everything a visitor does is kept in their own browser. There is no server.
+// What this browser remembers about its visitor. There is no server.
 
-const KEY = 'people-of-panvel:v1';
+const KEY = 'people-of-panvel:v2';
 
 const defaults = () => ({
   lang: null, // 'en' | 'mr'
-  me: null, // { name, look, status, archetype, home }
-  stamps: [], // landmark ids
-  met: [], // person ids
-  katta: [], // bookmarked person ids
-  posters: [], // { id, board, kind, title, when, by, ts }
-  done: [], // first-steps mission ids
-  seenTips: [], // district ids whose welcome note was dismissed
   sound: true,
-  hints: true,
-  view: 'fp', // 'fp' first person | 'tp' third person
+  view: 'tp', // 'tp' from behind | 'fp' through your own eyes
   quality: null,
-  netId: null, // random id used on the live relay
-  blocked: [], // people this visitor has blocked
-  liveOk: false, // has read and accepted the live rules
-  live: false, // was live last time, so rejoin
-  raceBest: 0, // best lap of the lake, in ms
-  hunt: null, // { date, found: [] } today's treasure hunt
+  invite: null, // the member's invite code, once they have used one here
+  look: null, // how the member's character looks
+  rulesOk: false, // has read what being a member means
+  blocked: [], // member ids this visitor has hidden
+  hinted: false, // has seen the one-line "how to move" hint
 });
 
 let state = defaults();
@@ -28,7 +19,7 @@ try {
   const raw = localStorage.getItem(KEY);
   if (raw) state = { ...defaults(), ...JSON.parse(raw) };
 } catch {
-  /* private mode or blocked storage: play on without saving */
+  /* private mode or blocked storage: carry on without saving */
 }
 
 let pending = 0;
@@ -53,14 +44,5 @@ export const store = {
     state[k] = [...state[k], v];
     if (!pending) pending = setTimeout(flush, 150);
     return true;
-  },
-  remove(k, v) {
-    state[k] = state[k].filter((x) => x !== v);
-    if (!pending) pending = setTimeout(flush, 150);
-  },
-  has: (k, v) => state[k].includes(v),
-  reset() {
-    state = defaults();
-    flush();
   },
 };
